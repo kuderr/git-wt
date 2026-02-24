@@ -299,6 +299,17 @@ cmd_path() {
   echo "$wt_path"
 }
 
+cmd_origin() {
+  local common_dir
+  common_dir=$(git rev-parse --git-common-dir 2>/dev/null) || die "not inside a git repository"
+
+  if [[ "$common_dir" == ".git" ]]; then
+    git rev-parse --show-toplevel
+  else
+    (cd "$common_dir" && cd .. && pwd)
+  fi
+}
+
 cmd_open() {
   local name="${1:?Usage: git wt open <name>}"
   local wt_path
@@ -357,6 +368,7 @@ ${BOLD}Usage:${RESET}
   git wt list-all          List worktrees across all repos
   git wt rm <name>         Remove a worktree and its branch
   git wt path <name>       Print worktree path
+  git wt origin            Print main repo path (origin of worktree)
   git wt open <name>       Open worktree in editor
   git wt clean             Remove all worktrees for current repo
 
@@ -401,6 +413,7 @@ case "$command" in
   list-all)         cmd_list_all "$@" ;;
   rm|remove)        cmd_rm "$@" ;;
   path|cd)          cmd_path "$@" ;;
+  origin)           cmd_origin "$@" ;;
   open)             cmd_open "$@" ;;
   clean)            cmd_clean "$@" ;;
   help|--help|-h)   cmd_help ;;

@@ -9,6 +9,7 @@ _git-wt() {
     'list-all:List worktrees across all repos'
     'rm:Remove a worktree and its branch'
     'path:Print worktree path'
+    'origin:Print main repo path'
     'open:Open worktree in editor'
     'clean:Remove all worktrees for current repo'
     'help:Show help'
