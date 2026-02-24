@@ -19,7 +19,7 @@ Makefile                — install/uninstall/lint/test targets
 
 ## Commands
 
-`new`, `list`, `list-all`, `rm`, `path`, `origin`, `open`, `clean`, `help`, `version`
+`new`, `list`, `list-all`, `adopt`, `rm`, `path`, `origin`, `open`, `clean`, `help`, `version`
 
 ## Development Rules
 

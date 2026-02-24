@@ -6,12 +6,13 @@ _git-wt() {
   subcommands=(
     'new:Create a new worktree'
     'list:List worktrees for current repo'
-    'list-all:List worktrees across all repos'
+    'list-all:List managed worktrees across all repos'
+    'adopt:Adopt an external worktree into git-wt'
     'rm:Remove a worktree and its branch'
     'path:Print worktree path'
     'origin:Print main repo path'
     'open:Open worktree in editor'
-    'clean:Remove all worktrees for current repo'
+    'clean:Remove all managed worktrees for current repo'
     'help:Show help'
     'version:Show version'
   )
@@ -33,6 +34,11 @@ _git-wt() {
             '(-p --prefix)'{-p,--prefix}'[Branch prefix]:prefix:' \
             '--no-branch[Use detached HEAD]' \
             '--copy-env[Copy .env files into worktree]' \
+            ':name:'
+          ;;
+        adopt)
+          _arguments \
+            ':path:_directories' \
             ':name:'
           ;;
         rm|remove|path|cd|open)
