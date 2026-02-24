@@ -95,6 +95,7 @@ This way your dev server starts immediately without missing config.
 | `git wt list-all` | List worktrees across **all** repos. |
 | `git wt rm <name>` | Remove a worktree and delete its branch. |
 | `git wt path <name>` | Print the worktree's absolute path. |
+| `git wt origin` | Print the main repo path (works from any worktree). |
 | `git wt open <name>` | Open the worktree in Cursor, VS Code, or `$EDITOR`. |
 | `git wt clean` | Remove **all** worktrees for the current repo. |
 | `git wt help` | Show help. |
@@ -179,9 +180,20 @@ git wt new --copy-env fix-tests
 git wt list-all
 ```
 
+### Finding the main repo
+
+When working inside a worktree, use `origin` to get the path back to the main repository:
+
+```bash
+cd $(git wt path swift-jade)
+git wt origin   # → /Users/you/projects/myapp
+```
+
+This works from the main repo too (prints its own path). Useful for scripts that need to reference the original repository.
+
 ### Agent Skill
 
-git-wt ships with a [SKILL.md](skill/SKILL.md) that teaches AI agents (Claude Code, Cursor, Windsurf, etc.) how and when to use `git wt` commands.
+git-wt ships with a [SKILL.md](skills/git-wt/SKILL.md) that teaches AI agents (Claude Code, Cursor, Windsurf, etc.) how and when to use `git wt` commands.
 
 **Install via npx:**
 

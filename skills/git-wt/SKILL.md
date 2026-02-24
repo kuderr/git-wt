@@ -41,6 +41,11 @@ git wt list                          # Worktrees for current repo
 git wt list-all                      # Worktrees across ALL repos
 ```
 
+### Find the main repo
+```bash
+git wt origin                        # Print main repo path (from any worktree)
+```
+
 ### Remove worktrees
 ```bash
 git wt rm <name>                     # Remove worktree + delete its branch
@@ -54,6 +59,7 @@ git wt clean                         # Remove ALL worktrees for current repo
 - **Naming**: auto-generates `adjective-noun` names if no name given
 - **`rm`**: removes both the worktree directory and its git branch
 - **`--copy-env`**: copies all `.env*` files from repo root (critical for dev servers)
+- **`origin`**: prints main repo path — works from any worktree or main repo itself
 
 ## Environment Variables
 

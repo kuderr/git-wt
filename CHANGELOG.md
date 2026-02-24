@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.1.0] - 2026-02-24
+
+### Added
+- `git wt origin` command — print the main repo path from any worktree
+
 ## [1.0.0] - 2026-02-24
 
 ### Added
