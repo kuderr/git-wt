@@ -181,7 +181,7 @@ git wt list-all
 
 ### Agent Skill
 
-git-wt ships with a [SKILL.md](SKILL.md) that teaches AI agents (Claude Code, Cursor, Windsurf, etc.) how and when to use `git wt` commands.
+git-wt ships with a [SKILL.md](skill/SKILL.md) that teaches AI agents (Claude Code, Cursor, Windsurf, etc.) how and when to use `git wt` commands.
 
 **Install via npx:**
 
@@ -194,11 +194,11 @@ npx skills add kuderr/git-wt
 ```bash
 # Claude Code
 mkdir -p ~/.claude/skills/git-wt
-cp SKILL.md ~/.claude/skills/git-wt/SKILL.md
+cp skill/SKILL.md ~/.claude/skills/git-wt/SKILL.md
 
 # Cursor
 mkdir -p .cursor/skills/git-wt
-cp SKILL.md .cursor/skills/git-wt/SKILL.md
+cp skill/SKILL.md .cursor/skills/git-wt/SKILL.md
 ```
 
 ## Comparison
