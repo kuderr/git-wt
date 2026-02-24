@@ -97,7 +97,6 @@ This way your dev server starts immediately without missing config.
 | `git wt path <name>` | Print the worktree's absolute path. |
 | `git wt open <name>` | Open the worktree in Cursor, VS Code, or `$EDITOR`. |
 | `git wt clean` | Remove **all** worktrees for the current repo. |
-| `git wt shell-init` | Output shell function for `wt cd`. |
 | `git wt help` | Show help. |
 | `git wt version` | Show version. |
 
@@ -125,28 +124,7 @@ Global flags:
 | `GIT_WT_HOME` | `~/.git-wt` | Root directory for all worktrees |
 | `GIT_WT_PREFIX` | `wt` | Branch name prefix |
 
-## Shell Integration
-
-### `wt cd` — jump into a worktree
-
-A subprocess can't change your shell's directory. To get `wt cd <name>`, add this to your shell profile:
-
-```bash
-# ~/.bashrc or ~/.zshrc
-eval "$(git wt shell-init)"
-```
-
-Then:
-
-```bash
-wt cd my-feature    # cd's into the worktree
-wt list             # same as git wt list
-wt new experiment   # same as git wt new experiment
-```
-
-The `wt` function wraps `git wt` — all commands work through it, but `wt cd` actually changes your directory.
-
-### Shell Completions
+## Shell Completions
 
 The installer sets up completions automatically. For manual setup:
 
@@ -225,16 +203,18 @@ cp SKILL.md .cursor/skills/git-wt/SKILL.md
 
 ## Comparison
 
-| | git-wt | [k1LoW/git-wt](https://github.com/k1LoW/git-wt) | [git-worktree-runner](https://github.com/coderabbitai/git-worktree-runner) | `git worktree` |
-|---|---|---|---|---|
-| Language | Bash | Go | Bash | C (built-in) |
-| Dependencies | None | Go runtime | None | — |
-| Global storage | ✅ `~/.git-wt/` | ❌ in-repo | ❌ in-repo | Manual |
-| Auto-naming | ✅ adjective-noun | ❌ | ❌ | ❌ |
-| .env copying | ✅ `--copy-env` | ❌ | ✅ | ❌ |
-| Shell completions | ✅ bash + zsh | ✅ | ❌ | ✅ |
-| Editor integration | ✅ Cursor/VS Code | ❌ | ✅ | ❌ |
-| Install time | ~5 seconds | ~30 seconds | ~10 seconds | Built-in |
+| | git-wt | [k1LoW/git-wt](https://github.com/k1LoW/git-wt) | [git-worktree-runner](https://github.com/coderabbitai/git-worktree-runner) | [worktree](https://github.com/agenttools/worktree) | `git worktree` |
+|---|---|---|---|---|---|
+| Language | Bash | Go | Bash | Node | C (built-in) |
+| Dependencies | None | Go runtime | None | Node.js | — |
+| Global storage | ✅ `~/.git-wt/` | ❌ in-repo | ❌ in-repo | ❌ in-repo | Manual |
+| Auto-naming | ✅ adjective-noun | ❌ | ❌ | ❌ | ❌ |
+| .env copying | ✅ `--copy-env` | ❌ | ✅ | ❌ | ❌ |
+| Shell completions | ✅ bash + zsh | ✅ | ❌ | ❌ | ✅ |
+| Editor integration | ✅ Cursor/VS Code | ❌ | ✅ | ❌ | ❌ |
+| Agent skill (SKILL.md) | ✅ `npx skills add` | ❌ | ❌ | ❌ | ❌ |
+| Multi-agent workflows | ✅ | ❌ | ✅ | ✅ Claude-only | ❌ |
+| Install time | ~5 seconds | ~30 seconds | ~10 seconds | ~15 seconds | Built-in |
 
 ## Uninstall
 

@@ -180,8 +180,8 @@ cmd_list() {
   fi
 
   printf "${BOLD}Worktrees for %s${RESET} ${DIM}(%s)${RESET}\n\n" "$repo_name" "$wt_root"
-  printf "  %-20s %-30s %-12s\n" "NAME" "BRANCH" "STATUS"
-  printf "  ${DIM}%-20s %-30s %-12s${RESET}\n" "----" "------" "------"
+  printf "  %-20s %-30s %s\n" "NAME" "BRANCH" "STATUS"
+  printf "  ${DIM}%-20s %-30s %s${RESET}\n" "----" "------" "------"
 
   local wt_path="" wt_branch="" wt_head=""
 
@@ -209,7 +209,8 @@ cmd_list() {
           else
             status="${GREEN}clean${RESET}"
           fi
-          printf "  %-20s %-30s ${status}\n" "$wt_name" "${wt_branch:-unknown}"
+          printf "  %-20s %-30s %b\n" "$wt_name" "${wt_branch:-unknown}" "$status"
+          printf "  ${DIM}  → %s${RESET}\n" "$wt_path"
         fi
         wt_path="" wt_branch="" wt_head=""
         ;;
@@ -242,6 +243,7 @@ cmd_list_all() {
       else
         printf "  %-18s %-20s ${DIM}%s${RESET}\n" "" "$name" "$branch"
       fi
+      printf "  %-18s ${DIM}→ %s${RESET}\n" "" "${wt_dir%/}"
       count=$((count + 1))
     done
 
@@ -357,7 +359,6 @@ ${BOLD}Usage:${RESET}
   git wt path <name>       Print worktree path
   git wt open <name>       Open worktree in editor
   git wt clean             Remove all worktrees for current repo
-  git wt shell-init        Output shell function for \`wt cd\`
 
 ${BOLD}Options for new:${RESET}
   -b, --base <branch>      Base branch to fork from (default: current)
@@ -374,31 +375,12 @@ ${BOLD}Examples:${RESET}
   git wt new my-feature            ${DIM}# ~/.git-wt/myrepo/my-feature/${RESET}
   git wt new -b main hotfix        ${DIM}# fork from main${RESET}
   git wt new --copy-env experiment ${DIM}# also copies .env files${RESET}
-  wt cd my-feature                  ${DIM}# jump into worktree (needs shell-init)${RESET}
-  cd \$(git wt path my-feature)     ${DIM}# jump into worktree (without shell-init)${RESET}
+  cd \$(git wt path my-feature)     ${DIM}# jump into worktree${RESET}
   git wt open my-feature           ${DIM}# open in Cursor/VS Code${RESET}
   git wt rm my-feature             ${DIM}# clean up${RESET}
 
 ${DIM}https://github.com/kuderr/git-wt${RESET}
 EOF
-}
-
-cmd_shell_init() {
-  cat <<'SHELL'
-# git-wt shell integration
-# Add to ~/.bashrc or ~/.zshrc:
-#   eval "$(git wt shell-init)"
-
-wt() {
-  if [[ "${1:-}" == "cd" ]]; then
-    local dir
-    dir=$(git wt path "${2:?Usage: wt cd <name>}" 2>&1) || { echo "$dir" >&2; return 1; }
-    cd "$dir" || return 1
-  else
-    command git wt "$@"
-  fi
-}
-SHELL
 }
 
 # --- Main ---
@@ -423,8 +405,7 @@ case "$command" in
   clean)            cmd_clean "$@" ;;
   help|--help|-h)   cmd_help ;;
   version|--version|-v) echo "git-wt ${GIT_WT_VERSION}" ;;
-  shell-init)       cmd_shell_init ;;  # output shell function for `wt cd`
-  _names)           _wt_names ;;       # internal: used by completions
+  _names)           _wt_names ;;  # internal: used by completions
   *)
     die "unknown command: ${command}\nRun 'git wt help' for usage."
     ;;
