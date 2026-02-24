@@ -20,12 +20,12 @@ WT_QUIET=false
 
 # --- Colors (respect NO_COLOR and non-tty) ---
 if [[ -t 1 ]] && [[ -z "${NO_COLOR:-}" ]]; then
-  RED='\033[0;31m'
-  GREEN='\033[0;32m'
-  YELLOW='\033[0;33m'
-  BOLD='\033[1m'
-  DIM='\033[2m'
-  RESET='\033[0m'
+  RED=$'\033[0;31m'
+  GREEN=$'\033[0;32m'
+  YELLOW=$'\033[0;33m'
+  BOLD=$'\033[1m'
+  DIM=$'\033[2m'
+  RESET=$'\033[0m'
 else
   RED='' GREEN='' YELLOW='' BOLD='' DIM='' RESET=''
 fi
@@ -354,9 +354,10 @@ ${BOLD}Usage:${RESET}
   git wt list              List worktrees for current repo
   git wt list-all          List worktrees across all repos
   git wt rm <name>         Remove a worktree and its branch
-  git wt path <name>       Print worktree path (use with cd)
+  git wt path <name>       Print worktree path
   git wt open <name>       Open worktree in editor
   git wt clean             Remove all worktrees for current repo
+  git wt shell-init        Output shell function for \`wt cd\`
 
 ${BOLD}Options for new:${RESET}
   -b, --base <branch>      Base branch to fork from (default: current)
@@ -373,12 +374,31 @@ ${BOLD}Examples:${RESET}
   git wt new my-feature            ${DIM}# ~/.git-wt/myrepo/my-feature/${RESET}
   git wt new -b main hotfix        ${DIM}# fork from main${RESET}
   git wt new --copy-env experiment ${DIM}# also copies .env files${RESET}
-  cd \$(git wt path my-feature)     ${DIM}# jump into worktree${RESET}
+  wt cd my-feature                  ${DIM}# jump into worktree (needs shell-init)${RESET}
+  cd \$(git wt path my-feature)     ${DIM}# jump into worktree (without shell-init)${RESET}
   git wt open my-feature           ${DIM}# open in Cursor/VS Code${RESET}
   git wt rm my-feature             ${DIM}# clean up${RESET}
 
 ${DIM}https://github.com/kuderr/git-wt${RESET}
 EOF
+}
+
+cmd_shell_init() {
+  cat <<'SHELL'
+# git-wt shell integration
+# Add to ~/.bashrc or ~/.zshrc:
+#   eval "$(git wt shell-init)"
+
+wt() {
+  if [[ "${1:-}" == "cd" ]]; then
+    local dir
+    dir=$(git wt path "${2:?Usage: wt cd <name>}" 2>&1) || { echo "$dir" >&2; return 1; }
+    cd "$dir" || return 1
+  else
+    command git wt "$@"
+  fi
+}
+SHELL
 }
 
 # --- Main ---
@@ -403,7 +423,8 @@ case "$command" in
   clean)            cmd_clean "$@" ;;
   help|--help|-h)   cmd_help ;;
   version|--version|-v) echo "git-wt ${GIT_WT_VERSION}" ;;
-  _names)           _wt_names ;;  # internal: used by completions
+  shell-init)       cmd_shell_init ;;  # output shell function for `wt cd`
+  _names)           _wt_names ;;       # internal: used by completions
   *)
     die "unknown command: ${command}\nRun 'git wt help' for usage."
     ;;

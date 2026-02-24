@@ -16,7 +16,7 @@ INSTALL_COMPLETIONS=true
 
 # Colors
 if [[ -t 1 ]] && [[ -z "${NO_COLOR:-}" ]]; then
-  GREEN='\033[0;32m' DIM='\033[2m' BOLD='\033[1m' RESET='\033[0m'
+  GREEN=$'\033[0;32m' DIM=$'\033[2m' BOLD=$'\033[1m' RESET=$'\033[0m'
 else
   GREEN='' DIM='' BOLD='' RESET=''
 fi

@@ -94,9 +94,10 @@ This way your dev server starts immediately without missing config.
 | `git wt list` | List all worktrees for the current repo with branch and status. |
 | `git wt list-all` | List worktrees across **all** repos. |
 | `git wt rm <name>` | Remove a worktree and delete its branch. |
-| `git wt path <name>` | Print the worktree's absolute path. Use with `cd`. |
+| `git wt path <name>` | Print the worktree's absolute path. |
 | `git wt open <name>` | Open the worktree in Cursor, VS Code, or `$EDITOR`. |
 | `git wt clean` | Remove **all** worktrees for the current repo. |
+| `git wt shell-init` | Output shell function for `wt cd`. |
 | `git wt help` | Show help. |
 | `git wt version` | Show version. |
 
@@ -124,7 +125,28 @@ Global flags:
 | `GIT_WT_HOME` | `~/.git-wt` | Root directory for all worktrees |
 | `GIT_WT_PREFIX` | `wt` | Branch name prefix |
 
-## Shell Completions
+## Shell Integration
+
+### `wt cd` — jump into a worktree
+
+A subprocess can't change your shell's directory. To get `wt cd <name>`, add this to your shell profile:
+
+```bash
+# ~/.bashrc or ~/.zshrc
+eval "$(git wt shell-init)"
+```
+
+Then:
+
+```bash
+wt cd my-feature    # cd's into the worktree
+wt list             # same as git wt list
+wt new experiment   # same as git wt new experiment
+```
+
+The `wt` function wraps `git wt` — all commands work through it, but `wt cd` actually changes your directory.
+
+### Shell Completions
 
 The installer sets up completions automatically. For manual setup:
 
