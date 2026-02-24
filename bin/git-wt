@@ -1,0 +1,410 @@
+#!/usr/bin/env bash
+# git-wt — fast git worktree manager
+# https://github.com/kuderr/git-wt
+#
+# Worktrees are stored globally at ~/.git-wt/<repo>/<name>/
+# No files inside your repo. No .gitignore changes needed.
+
+# shellcheck disable=SC2059  # intentional: ANSI color codes in printf format strings
+set -euo pipefail
+
+GIT_WT_VERSION="1.0.0"
+
+# --- Config ---
+GIT_WT_HOME="${GIT_WT_HOME:-${HOME}/.git-wt}"
+WT_PREFIX="${GIT_WT_PREFIX:-wt}"
+WT_BASE=""
+WT_NO_BRANCH=false
+WT_COPY_ENV=false
+WT_QUIET=false
+
+# --- Colors (respect NO_COLOR and non-tty) ---
+if [[ -t 1 ]] && [[ -z "${NO_COLOR:-}" ]]; then
+  RED='\033[0;31m'
+  GREEN='\033[0;32m'
+  YELLOW='\033[0;33m'
+  BOLD='\033[1m'
+  DIM='\033[2m'
+  RESET='\033[0m'
+else
+  RED='' GREEN='' YELLOW='' BOLD='' DIM='' RESET=''
+fi
+
+# --- Name generation ---
+ADJECTIVES=(
+  agile bold brave bright calm clever cool crisp cubic daring
+  eager fast fierce fleet fresh gentle grand happy keen kind
+  lively lucid merry nimble noble plain prime proud quick quiet
+  rapid sharp sleek smart snowy solid spicy stark steady sunny
+  swift tense tidy vivid warm witty young zesty clear light
+)
+NOUNS=(
+  arch beam bolt cape cove dawn dusk edge fern flux
+  gale glen haze iris jade knot lace lynx mesa node
+  opal peak pine quay reef sage tide vale wren zinc
+  aura blaze crest drift ember frost grove haven inlet jewel
+  kelp lotus marsh nexus orbit pulse ridge spark trail umbra
+)
+
+gen_name() {
+  local adj=${ADJECTIVES[$RANDOM % ${#ADJECTIVES[@]}]}
+  local noun=${NOUNS[$RANDOM % ${#NOUNS[@]}]}
+  echo "${adj}-${noun}"
+}
+
+# --- Helpers ---
+die() {
+  printf "${RED}error:${RESET} %s\n" "$1" >&2
+  exit 1
+}
+
+info() {
+  $WT_QUIET || printf "${GREEN}%s${RESET}\n" "$1"
+}
+
+warn() {
+  printf "${YELLOW}warning:${RESET} %s\n" "$1" >&2
+}
+
+get_repo_root() {
+  local toplevel
+  toplevel=$(git rev-parse --show-toplevel 2>/dev/null) && echo "$toplevel" && return
+
+  # might be inside a worktree — resolve via git common dir
+  local common
+  common=$(git rev-parse --git-common-dir 2>/dev/null)
+  if [[ -n "$common" && "$common" != ".git" ]]; then
+    (cd "$common" && cd .. && pwd)
+    return
+  fi
+
+  die "not inside a git repository"
+}
+
+get_repo_name() {
+  basename "$(get_repo_root)"
+}
+
+resolve_wt_dir() {
+  echo "${GIT_WT_HOME}/$(get_repo_name)"
+}
+
+current_branch() {
+  git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "HEAD"
+}
+
+# List worktree names for the current repo (used by completions)
+_wt_names() {
+  local wt_root
+  wt_root=$(resolve_wt_dir)
+  if [[ -d "$wt_root" ]]; then
+    # shellcheck disable=SC2012
+    ls "$wt_root" 2>/dev/null
+  fi
+}
+
+# --- Commands ---
+cmd_new() {
+  local name=""
+  local positional=()
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -b|--base)    WT_BASE="$2"; shift 2 ;;
+      -p|--prefix)  WT_PREFIX="$2"; shift 2 ;;
+      --no-branch)  WT_NO_BRANCH=true; shift ;;
+      --copy-env)   WT_COPY_ENV=true; shift ;;
+      -*)           die "unknown option: $1" ;;
+      *)            positional+=("$1"); shift ;;
+    esac
+  done
+
+  name="${positional[0]:-$(gen_name)}"
+  local wt_root
+  wt_root=$(resolve_wt_dir)
+  local wt_path="${wt_root}/${name}"
+
+  if [[ -d "$wt_path" ]]; then
+    die "worktree '${name}' already exists at ${wt_path}"
+  fi
+
+  local base="${WT_BASE:-$(current_branch)}"
+  local branch="${WT_PREFIX}/${name}"
+
+  mkdir -p "$wt_root"
+
+  if $WT_NO_BRANCH; then
+    info "Creating worktree '${name}' (detached HEAD from ${base})..."
+    git worktree add --detach "$wt_path" "$base"
+  else
+    info "Creating worktree '${name}' on branch '${branch}' from '${base}'..."
+    git worktree add -b "$branch" "$wt_path" "$base"
+  fi
+
+  # Copy env files if requested
+  if $WT_COPY_ENV; then
+    local repo_root
+    repo_root=$(get_repo_root)
+    local copied=0
+    for envfile in "${repo_root}"/.env*; do
+      if [[ -f "$envfile" ]]; then
+        cp "$envfile" "$wt_path/"
+        $WT_QUIET || printf "  Copied %s\n" "$(basename "$envfile")"
+        copied=$((copied + 1))
+      fi
+    done
+    if [[ $copied -eq 0 ]]; then
+      warn "no .env* files found to copy"
+    fi
+  fi
+
+  echo ""
+  printf "${BOLD}Worktree ready:${RESET}\n"
+  printf "  Path:   %s\n" "${wt_path}"
+  if ! $WT_NO_BRANCH; then
+    printf "  Branch: %s\n" "${branch}"
+  fi
+  echo ""
+  printf "  ${DIM}cd %s${RESET}\n" "${wt_path}"
+}
+
+cmd_list() {
+  local wt_root
+  wt_root=$(resolve_wt_dir)
+  local repo_name
+  repo_name=$(get_repo_name)
+
+  if [[ ! -d "$wt_root" ]] || [[ -z "$(ls -A "$wt_root" 2>/dev/null)" ]]; then
+    echo "No worktrees for '${repo_name}'"
+    return
+  fi
+
+  printf "${BOLD}Worktrees for %s${RESET} ${DIM}(%s)${RESET}\n\n" "$repo_name" "$wt_root"
+  printf "  %-20s %-30s %-12s\n" "NAME" "BRANCH" "STATUS"
+  printf "  ${DIM}%-20s %-30s %-12s${RESET}\n" "----" "------" "------"
+
+  local wt_path="" wt_branch="" wt_head=""
+
+  git worktree list --porcelain | while IFS= read -r line; do
+    case "$line" in
+      "worktree "*)
+        wt_path="${line#worktree }"
+        ;;
+      "branch "*)
+        wt_branch="${line#branch refs/heads/}"
+        ;;
+      "HEAD "*)
+        wt_head="${line#HEAD }"
+        ;;
+      "detached")
+        wt_branch="(detached ${wt_head:0:7})"
+        ;;
+      "")
+        if [[ "$wt_path" == "${wt_root}/"* ]]; then
+          local wt_name
+          wt_name=$(basename "$wt_path")
+          local status="clean"
+          if (cd "$wt_path" 2>/dev/null && [[ -n "$(git status --porcelain 2>/dev/null)" ]]); then
+            status="${YELLOW}modified${RESET}"
+          else
+            status="${GREEN}clean${RESET}"
+          fi
+          printf "  %-20s %-30s ${status}\n" "$wt_name" "${wt_branch:-unknown}"
+        fi
+        wt_path="" wt_branch="" wt_head=""
+        ;;
+    esac
+  done
+}
+
+cmd_list_all() {
+  if [[ ! -d "$GIT_WT_HOME" ]] || [[ -z "$(ls -A "$GIT_WT_HOME" 2>/dev/null)" ]]; then
+    echo "No worktrees found in ${GIT_WT_HOME}"
+    return
+  fi
+
+  printf "${BOLD}All worktrees${RESET} ${DIM}(%s)${RESET}\n\n" "$GIT_WT_HOME"
+
+  for repo_dir in "${GIT_WT_HOME}"/*/; do
+    [[ -d "$repo_dir" ]] || continue
+    local repo
+    repo=$(basename "$repo_dir")
+    local count=0
+
+    for wt_dir in "${repo_dir}"/*/; do
+      [[ -d "$wt_dir" ]] || continue
+      local name
+      name=$(basename "$wt_dir")
+      local branch
+      branch=$(cd "$wt_dir" && git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "???")
+      if [[ $count -eq 0 ]]; then
+        printf "  ${BOLD}%-18s${RESET} %-20s ${DIM}%s${RESET}\n" "$repo" "$name" "$branch"
+      else
+        printf "  %-18s %-20s ${DIM}%s${RESET}\n" "" "$name" "$branch"
+      fi
+      count=$((count + 1))
+    done
+
+    if [[ $count -eq 0 ]]; then
+      printf "  ${BOLD}%-18s${RESET} ${DIM}(empty)${RESET}\n" "$repo"
+    fi
+  done
+}
+
+cmd_rm() {
+  local name="${1:?Usage: git wt rm <name>}"
+  local wt_root
+  wt_root=$(resolve_wt_dir)
+  local wt_path="${wt_root}/${name}"
+
+  if [[ ! -d "$wt_path" ]]; then
+    die "worktree '${name}' not found at ${wt_path}"
+  fi
+
+  # Get branch name before removing
+  local branch
+  branch=$(cd "$wt_path" && git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+
+  info "Removing worktree '${name}'..."
+  git worktree remove "$wt_path" --force
+
+  # Delete the branch if it was a managed branch
+  if [[ -n "$branch" && "$branch" != "HEAD" ]]; then
+    if git show-ref --verify --quiet "refs/heads/$branch" 2>/dev/null; then
+      info "Deleting branch '${branch}'..."
+      git branch -D "$branch" 2>/dev/null || true
+    fi
+  fi
+
+  # Clean up empty repo directory
+  if [[ -d "$wt_root" ]] && [[ -z "$(ls -A "$wt_root" 2>/dev/null)" ]]; then
+    rmdir "$wt_root"
+  fi
+
+  info "Done."
+}
+
+cmd_path() {
+  local name="${1:?Usage: git wt path <name>}"
+  local wt_root
+  wt_root=$(resolve_wt_dir)
+  local wt_path="${wt_root}/${name}"
+
+  if [[ ! -d "$wt_path" ]]; then
+    die "worktree '${name}' not found"
+  fi
+
+  echo "$wt_path"
+}
+
+cmd_open() {
+  local name="${1:?Usage: git wt open <name>}"
+  local wt_path
+  wt_path=$(cmd_path "$name")
+
+  if command -v cursor &>/dev/null; then
+    cursor "$wt_path"
+  elif command -v code &>/dev/null; then
+    code "$wt_path"
+  elif [[ -n "${EDITOR:-}" ]]; then
+    $EDITOR "$wt_path"
+  else
+    warn "no editor found (tried: cursor, code, \$EDITOR)"
+    echo "  cd ${wt_path}"
+  fi
+}
+
+cmd_clean() {
+  local wt_root
+  wt_root=$(resolve_wt_dir)
+  local repo_name
+  repo_name=$(get_repo_name)
+
+  if [[ ! -d "$wt_root" ]] || [[ -z "$(ls -A "$wt_root" 2>/dev/null)" ]]; then
+    echo "No worktrees to clean for '${repo_name}'."
+    return
+  fi
+
+  local count=0
+  for dir in "${wt_root}"/*/; do
+    [[ -d "$dir" ]] || continue
+    local name
+    name=$(basename "$dir")
+    cmd_rm "$name"
+    count=$((count + 1))
+  done
+
+  if [[ $count -eq 0 ]]; then
+    echo "No worktrees to clean."
+  else
+    info "Cleaned ${count} worktree(s)."
+  fi
+
+  git worktree prune
+}
+
+cmd_help() {
+  cat <<EOF
+${BOLD}git-wt${RESET} v${GIT_WT_VERSION} — fast git worktree manager
+
+Worktrees are stored in ${DIM}${GIT_WT_HOME}/<repo>/<name>/${RESET}
+
+${BOLD}Usage:${RESET}
+  git wt new [name]        Create a new worktree (auto-names if omitted)
+  git wt list              List worktrees for current repo
+  git wt list-all          List worktrees across all repos
+  git wt rm <name>         Remove a worktree and its branch
+  git wt path <name>       Print worktree path (use with cd)
+  git wt open <name>       Open worktree in editor
+  git wt clean             Remove all worktrees for current repo
+
+${BOLD}Options for new:${RESET}
+  -b, --base <branch>      Base branch to fork from (default: current)
+  -p, --prefix <prefix>    Branch prefix (default: wt/)
+  --no-branch              Use detached HEAD
+  --copy-env               Copy .env* files into new worktree
+
+${BOLD}Environment:${RESET}
+  GIT_WT_HOME              Worktrees root (default: ~/.git-wt)
+  GIT_WT_PREFIX            Default branch prefix (default: wt)
+
+${BOLD}Examples:${RESET}
+  git wt new                       ${DIM}# ~/.git-wt/myrepo/swift-jade/${RESET}
+  git wt new my-feature            ${DIM}# ~/.git-wt/myrepo/my-feature/${RESET}
+  git wt new -b main hotfix        ${DIM}# fork from main${RESET}
+  git wt new --copy-env experiment ${DIM}# also copies .env files${RESET}
+  cd \$(git wt path my-feature)     ${DIM}# jump into worktree${RESET}
+  git wt open my-feature           ${DIM}# open in Cursor/VS Code${RESET}
+  git wt rm my-feature             ${DIM}# clean up${RESET}
+
+${DIM}https://github.com/kuderr/git-wt${RESET}
+EOF
+}
+
+# --- Main ---
+# Global flags
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -q|--quiet) WT_QUIET=true; shift ;;
+    *)          break ;;
+  esac
+done
+
+command="${1:-help}"
+shift || true
+
+case "$command" in
+  new)              cmd_new "$@" ;;
+  list|ls)          cmd_list "$@" ;;
+  list-all)         cmd_list_all "$@" ;;
+  rm|remove)        cmd_rm "$@" ;;
+  path|cd)          cmd_path "$@" ;;
+  open)             cmd_open "$@" ;;
+  clean)            cmd_clean "$@" ;;
+  help|--help|-h)   cmd_help ;;
+  version|--version|-v) echo "git-wt ${GIT_WT_VERSION}" ;;
+  _names)           _wt_names ;;  # internal: used by completions
+  *)
+    die "unknown command: ${command}\nRun 'git wt help' for usage."
+    ;;
+esac
