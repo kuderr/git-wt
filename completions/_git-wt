@@ -1,7 +1,5 @@
 #compdef git-wt
-
-# zsh completion for git-wt
-# Place in a directory in your $fpath (e.g., ~/.local/share/zsh/site-functions/)
+#description fast git worktree manager
 
 _git-wt() {
   local -a subcommands

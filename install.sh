@@ -71,12 +71,16 @@ if $INSTALL_COMPLETIONS; then
   download "${BASE_URL}/completions/_git-wt" > "${zsh_comp_dir}/_git-wt"
   printf "  ${GREEN}✓${RESET} Zsh completions  → %s\n" "${zsh_comp_dir}/_git-wt"
 
-  # Check if zsh fpath includes the completion dir
+  # Ensure zsh fpath includes the completion dir
   if [[ "${SHELL:-}" == *"zsh"* ]]; then
-    if ! zsh -c 'echo $fpath' 2>/dev/null | grep -q "site-functions"; then
-      echo ""
-      printf "  ${DIM}Add to ~/.zshrc for zsh completions:${RESET}\n"
-      printf "  ${DIM}  fpath=(~/.local/share/zsh/site-functions \$fpath)${RESET}\n"
+    if ! zsh -c 'printf "%s\n" $fpath' 2>/dev/null | grep -qx "${zsh_comp_dir}"; then
+      local zshrc="${HOME}/.zshrc"
+      if [[ -f "$zshrc" ]] && grep -qF 'fpath=(~/.local/share/zsh/site-functions' "$zshrc" 2>/dev/null; then
+        : # already present
+      else
+        printf '\nfpath=(~/.local/share/zsh/site-functions $fpath)\n' >> "$zshrc"
+        printf "  ${GREEN}✓${RESET} Added fpath to %s\n" "$zshrc"
+      fi
     fi
   fi
 fi

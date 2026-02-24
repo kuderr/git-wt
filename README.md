@@ -216,6 +216,10 @@ cp skill/SKILL.md .cursor/skills/git-wt/SKILL.md
 | Multi-agent workflows | ✅ | ❌ | ✅ | ✅ Claude-only | ❌ |
 | Install time | ~5 seconds | ~30 seconds | ~10 seconds | ~15 seconds | Built-in |
 
+## Known Issues
+
+- **Warp Terminal**: Tab completions for `git wt` don't work. Warp uses its own completion engine and [doesn't delegate to shell completions](https://github.com/warpdotdev/Warp/discussions/434). Completions work correctly in Terminal.app, iTerm2, Ghostty, Kitty, and other terminals that use native zsh/bash completion.
+
 ## Uninstall
 
 ```bash
