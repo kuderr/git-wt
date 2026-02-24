@@ -54,11 +54,11 @@ chmod +x ~/.local/bin/git-wt
 ```bash
 cd ~/projects/myapp
 
-# Create a worktree (auto-named)
+# Create a worktree (auto-named, e.g. "swift-jade")
 git wt new
 
-# Create a named worktree with .env files
-git wt new --copy-env auth-refactor
+# Create a named worktree
+git wt new auth-refactor
 
 # Jump into it
 cd $(git wt path auth-refactor)
@@ -72,6 +72,19 @@ git wt open auth-refactor
 # Clean up when done
 git wt rm auth-refactor
 ```
+
+### Copying `.env` files
+
+Worktrees are separate directories — your `.env` files (gitignored) won't be there.
+Use `--copy-env` to copy all `.env*` files from the repo root into the new worktree:
+
+```bash
+git wt new --copy-env my-feature
+# Copied .env
+# Copied .env.local
+```
+
+This way your dev server starts immediately without missing config.
 
 ## Commands
 
