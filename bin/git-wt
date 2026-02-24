@@ -8,7 +8,7 @@
 # shellcheck disable=SC2059  # intentional: ANSI color codes in printf format strings
 set -euo pipefail
 
-GIT_WT_VERSION="1.0.0"
+GIT_WT_VERSION="1.2.0"
 
 # --- Config ---
 GIT_WT_HOME="${GIT_WT_HOME:-${HOME}/.git-wt}"
@@ -93,6 +93,63 @@ current_branch() {
   git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "HEAD"
 }
 
+# Resolve a worktree name or path to its absolute path.
+# Checks: managed name → absolute path → external basename match.
+resolve_wt_path() {
+  local arg="$1"
+  local wt_root
+  wt_root=$(resolve_wt_dir)
+
+  # 1. Managed worktree by name
+  if [[ -d "${wt_root}/${arg}" ]]; then
+    echo "${wt_root}/${arg}"
+    return 0
+  fi
+
+  # 2. Absolute path — verify it's a known worktree
+  if [[ "$arg" == /* ]]; then
+    if git worktree list --porcelain | grep -q "^worktree ${arg}$"; then
+      echo "$arg"
+      return 0
+    fi
+    return 1
+  fi
+
+  # 3. Match basename among external worktrees
+  local repo_root matches=()
+  repo_root=$(get_repo_root)
+  local wt_path=""
+
+  while IFS= read -r line; do
+    case "$line" in
+      "worktree "*)  wt_path="${line#worktree }" ;;
+      "bare")        wt_path="" ;;
+      "")
+        if [[ -n "$wt_path" && "$wt_path" != "$repo_root" && "$wt_path" != "${wt_root}/"* ]]; then
+          if [[ "$(basename "$wt_path")" == "$arg" ]]; then
+            matches+=("$wt_path")
+          fi
+        fi
+        wt_path=""
+        ;;
+    esac
+  done < <(git worktree list --porcelain && echo "")
+
+  if [[ ${#matches[@]} -eq 1 ]]; then
+    echo "${matches[0]}"
+    return 0
+  elif [[ ${#matches[@]} -gt 1 ]]; then
+    printf "error: ambiguous name '%s' matches multiple external worktrees:\n" "$arg" >&2
+    for m in "${matches[@]}"; do
+      printf "  %s\n" "$m" >&2
+    done
+    printf "Use the full path instead.\n" >&2
+    return 1
+  fi
+
+  return 1
+}
+
 # List worktree names for the current repo (used by completions)
 _wt_names() {
   local wt_root
@@ -101,6 +158,22 @@ _wt_names() {
     # shellcheck disable=SC2012
     ls "$wt_root" 2>/dev/null
   fi
+
+  # Include external worktree basenames
+  local repo_root wt_path=""
+  repo_root=$(get_repo_root 2>/dev/null) || return
+  while IFS= read -r line; do
+    case "$line" in
+      "worktree "*)  wt_path="${line#worktree }" ;;
+      "bare")        wt_path="" ;;
+      "")
+        if [[ -n "$wt_path" && "$wt_path" != "$repo_root" && "$wt_path" != "${wt_root}/"* ]]; then
+          basename "$wt_path"
+        fi
+        wt_path=""
+        ;;
+    esac
+  done < <(git worktree list --porcelain 2>/dev/null && echo "")
 }
 
 # --- Commands ---
@@ -173,8 +246,46 @@ cmd_list() {
   wt_root=$(resolve_wt_dir)
   local repo_name
   repo_name=$(get_repo_name)
+  local repo_root
+  repo_root=$(get_repo_root)
 
-  if [[ ! -d "$wt_root" ]] || [[ -z "$(ls -A "$wt_root" 2>/dev/null)" ]]; then
+  local output="" count=0
+  local wt_path="" wt_branch="" wt_head="" is_bare=false
+
+  while IFS= read -r line; do
+    case "$line" in
+      "worktree "*)  wt_path="${line#worktree }" ;;
+      "branch "*)    wt_branch="${line#branch refs/heads/}" ;;
+      "HEAD "*)      wt_head="${line#HEAD }" ;;
+      "detached")    wt_branch="(detached ${wt_head:0:7})" ;;
+      "bare")        is_bare=true ;;
+      "")
+        if ! $is_bare && [[ -n "$wt_path" && "$wt_path" != "$repo_root" ]]; then
+          local wt_name status tag=""
+          wt_name=$(basename "$wt_path")
+
+          if [[ ! -d "$wt_path" ]]; then
+            status="${RED}missing${RESET}"
+          elif (cd "$wt_path" 2>/dev/null && [[ -n "$(git status --porcelain 2>/dev/null)" ]]); then
+            status="${YELLOW}modified${RESET}"
+          else
+            status="${GREEN}clean${RESET}"
+          fi
+
+          if [[ "$wt_path" != "${wt_root}/"* ]]; then
+            tag="  ${DIM}[external]${RESET}"
+          fi
+
+          output+="$(printf "  %-20s %-30s %b%b\n" "$wt_name" "${wt_branch:-unknown}" "$status" "$tag")"$'\n'
+          output+="$(printf "  ${DIM}  → %s${RESET}\n" "$wt_path")"$'\n'
+          count=$((count + 1))
+        fi
+        wt_path="" wt_branch="" wt_head="" is_bare=false
+        ;;
+    esac
+  done < <(git worktree list --porcelain && echo "")
+
+  if [[ $count -eq 0 ]]; then
     echo "No worktrees for '${repo_name}'"
     return
   fi
@@ -182,40 +293,7 @@ cmd_list() {
   printf "${BOLD}Worktrees for %s${RESET} ${DIM}(%s)${RESET}\n\n" "$repo_name" "$wt_root"
   printf "  %-20s %-30s %s\n" "NAME" "BRANCH" "STATUS"
   printf "  ${DIM}%-20s %-30s %s${RESET}\n" "----" "------" "------"
-
-  local wt_path="" wt_branch="" wt_head=""
-
-  git worktree list --porcelain | while IFS= read -r line; do
-    case "$line" in
-      "worktree "*)
-        wt_path="${line#worktree }"
-        ;;
-      "branch "*)
-        wt_branch="${line#branch refs/heads/}"
-        ;;
-      "HEAD "*)
-        wt_head="${line#HEAD }"
-        ;;
-      "detached")
-        wt_branch="(detached ${wt_head:0:7})"
-        ;;
-      "")
-        if [[ "$wt_path" == "${wt_root}/"* ]]; then
-          local wt_name
-          wt_name=$(basename "$wt_path")
-          local status="clean"
-          if (cd "$wt_path" 2>/dev/null && [[ -n "$(git status --porcelain 2>/dev/null)" ]]); then
-            status="${YELLOW}modified${RESET}"
-          else
-            status="${GREEN}clean${RESET}"
-          fi
-          printf "  %-20s %-30s %b\n" "$wt_name" "${wt_branch:-unknown}" "$status"
-          printf "  ${DIM}  → %s${RESET}\n" "$wt_path"
-        fi
-        wt_path="" wt_branch="" wt_head=""
-        ;;
-    esac
-  done
+  printf "%s" "$output"
 }
 
 cmd_list_all() {
@@ -232,6 +310,7 @@ cmd_list_all() {
     repo=$(basename "$repo_dir")
     local count=0
 
+    # Collect managed worktrees
     for wt_dir in "${repo_dir}"/*/; do
       [[ -d "$wt_dir" ]] || continue
       local name
@@ -254,14 +333,28 @@ cmd_list_all() {
 }
 
 cmd_rm() {
-  local name="${1:?Usage: git wt rm <name>}"
+  local arg="${1:?Usage: git wt rm <name|path>}"
   local wt_root
   wt_root=$(resolve_wt_dir)
-  local wt_path="${wt_root}/${name}"
+  local wt_path=""
 
-  if [[ ! -d "$wt_path" ]]; then
-    die "worktree '${name}' not found at ${wt_path}"
+  # Resolve: managed name, or absolute path under wt_root
+  if [[ -d "${wt_root}/${arg}" ]]; then
+    wt_path="${wt_root}/${arg}"
+  elif [[ "$arg" == /* && "$arg" == "${wt_root}/"* && -d "$arg" ]]; then
+    wt_path="$arg"
   fi
+
+  if [[ -z "$wt_path" ]]; then
+    # Check if it's an external worktree — hint the user to adopt first
+    if resolve_wt_path "$arg" >/dev/null 2>&1; then
+      die "worktree '${arg}' is external — run 'git wt adopt' first"
+    fi
+    die "worktree '${arg}' not found"
+  fi
+
+  local name
+  name=$(basename "$wt_path")
 
   # Get branch name before removing
   local branch
@@ -270,7 +363,7 @@ cmd_rm() {
   info "Removing worktree '${name}'..."
   git worktree remove "$wt_path" --force
 
-  # Delete the branch if it was a managed branch
+  # Delete the branch (safe — this is a managed worktree)
   if [[ -n "$branch" && "$branch" != "HEAD" ]]; then
     if git show-ref --verify --quiet "refs/heads/$branch" 2>/dev/null; then
       info "Deleting branch '${branch}'..."
@@ -287,16 +380,89 @@ cmd_rm() {
 }
 
 cmd_path() {
-  local name="${1:?Usage: git wt path <name>}"
-  local wt_root
-  wt_root=$(resolve_wt_dir)
-  local wt_path="${wt_root}/${name}"
+  local name="${1:?Usage: git wt path <name|path>}"
+  local wt_path
 
-  if [[ ! -d "$wt_path" ]]; then
+  if ! wt_path=$(resolve_wt_path "$name"); then
     die "worktree '${name}' not found"
   fi
 
   echo "$wt_path"
+}
+
+cmd_adopt() {
+  local positional=()
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -*)  die "unknown option: $1" ;;
+      *)   positional+=("$1"); shift ;;
+    esac
+  done
+
+  local path="${positional[0]:?Usage: git wt adopt <name|path> [name]}"
+  local name="${positional[1]:-}"
+
+  # Try resolving as external worktree name first, then as path
+  if [[ "$path" != /* ]] && [[ ! -d "$path" ]]; then
+    local resolved
+    if resolved=$(resolve_wt_path "$path" 2>/dev/null); then
+      path="$resolved"
+    else
+      die "worktree '${path}' not found"
+    fi
+  else
+    # Resolve relative path to absolute
+    if [[ "$path" != /* ]]; then
+      path=$(cd "$path" 2>/dev/null && pwd) || die "path does not exist: ${positional[0]}"
+    fi
+    # Validate it's a real worktree
+    if ! git worktree list --porcelain | grep -q "^worktree ${path}$"; then
+      die "'${path}' is not a git worktree"
+    fi
+  fi
+
+  # Can't adopt the main worktree (use cmd_origin logic for reliable detection)
+  local repo_root
+  repo_root=$(cmd_origin)
+  if [[ "$path" == "$repo_root" ]]; then
+    die "cannot adopt the main worktree"
+  fi
+
+  local wt_root
+  wt_root=$(resolve_wt_dir)
+
+  # Already managed?
+  if [[ "$path" == "${wt_root}/"* ]]; then
+    die "worktree is already managed by git-wt at ${path}"
+  fi
+
+  # Derive name
+  if [[ -z "$name" ]]; then
+    name=$(basename "$path")
+  fi
+
+  local target="${wt_root}/${name}"
+
+  if [[ -d "$target" ]]; then
+    die "worktree '${name}' already exists at ${target}"
+  fi
+
+  mkdir -p "$wt_root"
+
+  info "Adopting worktree '${name}'..."
+  git worktree move "$path" "$target"
+
+  # Get branch info
+  local branch
+  branch=$(cd "$target" && git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
+
+  echo ""
+  printf "${BOLD}Worktree adopted:${RESET}\n"
+  printf "  Path:   %s\n" "${target}"
+  printf "  Branch: %s\n" "${branch}"
+  echo ""
+  printf "  ${DIM}cd %s${RESET}\n" "${target}"
 }
 
 cmd_origin() {
@@ -363,14 +529,15 @@ ${BOLD}git-wt${RESET} v${GIT_WT_VERSION} — fast git worktree manager
 Worktrees are stored in ${DIM}${GIT_WT_HOME}/<repo>/<name>/${RESET}
 
 ${BOLD}Usage:${RESET}
-  git wt new [name]        Create a new worktree (auto-names if omitted)
-  git wt list              List worktrees for current repo
-  git wt list-all          List worktrees across all repos
-  git wt rm <name>         Remove a worktree and its branch
-  git wt path <name>       Print worktree path
-  git wt origin            Print main repo path (origin of worktree)
-  git wt open <name>       Open worktree in editor
-  git wt clean             Remove all worktrees for current repo
+  git wt new [name]            Create a new worktree (auto-names if omitted)
+  git wt list                  List worktrees for current repo
+  git wt list-all              List managed worktrees across all repos
+  git wt adopt <name|path> [name]  Adopt an external worktree into git-wt
+  git wt rm <name|path>        Remove a managed worktree and its branch
+  git wt path <name|path>      Print worktree path
+  git wt origin                Print main repo path (origin of worktree)
+  git wt open <name|path>      Open worktree in editor
+  git wt clean                 Remove all managed worktrees for current repo
 
 ${BOLD}Options for new:${RESET}
   -b, --base <branch>      Base branch to fork from (default: current)
@@ -389,6 +556,7 @@ ${BOLD}Examples:${RESET}
   git wt new --copy-env experiment ${DIM}# also copies .env files${RESET}
   cd \$(git wt path my-feature)     ${DIM}# jump into worktree${RESET}
   git wt open my-feature           ${DIM}# open in Cursor/VS Code${RESET}
+  git wt adopt ../my-hotfix        ${DIM}# adopt external worktree${RESET}
   git wt rm my-feature             ${DIM}# clean up${RESET}
 
 ${DIM}https://github.com/kuderr/git-wt${RESET}
@@ -413,6 +581,7 @@ case "$command" in
   list-all)         cmd_list_all "$@" ;;
   rm|remove)        cmd_rm "$@" ;;
   path|cd)          cmd_path "$@" ;;
+  adopt)            cmd_adopt "$@" ;;
   origin)           cmd_origin "$@" ;;
   open)             cmd_open "$@" ;;
   clean)            cmd_clean "$@" ;;

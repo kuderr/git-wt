@@ -86,18 +86,39 @@ git wt new --copy-env my-feature
 
 This way your dev server starts immediately without missing config.
 
+### External worktrees
+
+git-wt can see and manage worktrees created outside of `git wt` (e.g., via `git worktree add`).
+They show up in `git wt list` with an `[external]` tag, and `rm`/`path`/`open` work with them too:
+
+```bash
+# Created elsewhere
+git worktree add ../my-hotfix main
+
+# Visible in list
+git wt list
+#   my-hotfix   main   clean  [external]
+
+# Adopt it — moves it under ~/.git-wt/ management
+git wt adopt my-hotfix          # by name from list
+git wt adopt ../my-hotfix       # or by path
+```
+
+After `adopt`, the worktree is managed by git-wt like any other.
+
 ## Commands
 
 | Command | Description |
 |---------|-------------|
 | `git wt new [name]` | Create a new worktree. Auto-generates a name if omitted. |
-| `git wt list` | List all worktrees for the current repo with branch and status. |
-| `git wt list-all` | List worktrees across **all** repos. |
-| `git wt rm <name>` | Remove a worktree and delete its branch. |
-| `git wt path <name>` | Print the worktree's absolute path. |
+| `git wt list` | List all worktrees for the current repo (managed + external). |
+| `git wt list-all` | List managed worktrees across **all** repos. |
+| `git wt adopt <name\|path> [name]` | Adopt an external worktree into git-wt management. |
+| `git wt rm <name\|path>` | Remove a managed worktree and delete its branch. |
+| `git wt path <name\|path>` | Print the worktree's absolute path. |
 | `git wt origin` | Print the main repo path (works from any worktree). |
-| `git wt open <name>` | Open the worktree in Cursor, VS Code, or `$EDITOR`. |
-| `git wt clean` | Remove **all** worktrees for the current repo. |
+| `git wt open <name\|path>` | Open worktree in Cursor, VS Code, or `$EDITOR`. |
+| `git wt clean` | Remove all **managed** worktrees for the current repo. |
 | `git wt help` | Show help. |
 | `git wt version` | Show version. |
 
@@ -159,7 +180,7 @@ Completions support subcommands, flags, worktree names, and branch names.
 - **Repo name** is detected from the working directory via `git rev-parse --show-toplevel`.
 - **Branches** are prefixed with `wt/` by default (e.g., `wt/swift-jade`).
 - **Names** are auto-generated from 50 adjectives × 48 nouns = 2,400 combinations.
-- `git wt rm` removes the worktree directory **and** deletes the branch.
+- `git wt rm` only works on managed worktrees — removes the directory and deletes its branch. External worktrees must be adopted first.
 - Works from inside a worktree — always resolves back to the main repo.
 
 ## AI Agent Integration

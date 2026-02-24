@@ -12,7 +12,7 @@ _git_wt() {
   for ((i = 1; i < COMP_CWORD; i++)); do
     case "${COMP_WORDS[i]}" in
       -q|--quiet) continue ;;
-      new|list|list-all|ls|rm|remove|path|cd|origin|open|clean|help|version|--version|-v)
+      new|list|list-all|ls|rm|remove|path|cd|origin|open|adopt|clean|help|version|--version|-v)
         subcmd="${COMP_WORDS[i]}"
         break
         ;;
@@ -24,7 +24,7 @@ _git_wt() {
     if [[ "$cur" == -* ]]; then
       COMPREPLY=($(compgen -W "-q --quiet --help --version" -- "$cur"))
     else
-      COMPREPLY=($(compgen -W "new list list-all rm path origin open clean help version" -- "$cur"))
+      COMPREPLY=($(compgen -W "new list list-all adopt rm path origin open clean help version" -- "$cur"))
     fi
     return
   fi
@@ -37,6 +37,10 @@ _git_wt() {
       if [[ -n "$names" ]]; then
         COMPREPLY=($(compgen -W "$names" -- "$cur"))
       fi
+      ;;
+    adopt)
+      # Complete with directory paths
+      COMPREPLY=($(compgen -d -- "$cur"))
       ;;
     new)
       case "$prev" in

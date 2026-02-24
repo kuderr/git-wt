@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.0] - 2026-02-24
+
+### Added
+- `git wt adopt <name|path> [name]` — adopt an external worktree into git-wt management
+- `git wt list` now shows external worktrees with `[external]` tag
+- `path` and `open` now work with external worktrees (by basename or full path)
+- `rm` on an external worktree gives a clear hint to `adopt` first
+
 ## [1.1.0] - 2026-02-24
 
 ### Added
