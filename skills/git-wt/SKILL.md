@@ -4,7 +4,7 @@ description: >
   Fast git worktree manager. Use when the user wants to create, list, switch
   between, or clean up git worktrees. Handles parallel development workflows,
   agent isolation, and multi-branch work.
-allowed-tools: Bash(git wt *), Bash(cd *)
+allowed-tools: Bash(git wt *)
 ---
 
 # git-wt — Git Worktree Manager
@@ -14,10 +14,9 @@ Worktrees live outside the repo — no `.gitignore` changes needed.
 
 ## Prerequisites
 
-`git-wt` must be installed and in PATH. Install:
-```bash
-curl -fsSL https://raw.githubusercontent.com/kuderr/git-wt/main/install.sh | bash
-```
+`git-wt` must be installed and in PATH. Verify with `git wt --version`.
+
+If not installed, ask the user to install it from: https://github.com/kuderr/git-wt#install
 
 ## Commands Reference
 
