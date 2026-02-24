@@ -74,10 +74,11 @@ if $INSTALL_COMPLETIONS; then
   # Ensure zsh fpath includes the completion dir
   if [[ "${SHELL:-}" == *"zsh"* ]]; then
     if ! zsh -c 'printf "%s\n" $fpath' 2>/dev/null | grep -qx "${zsh_comp_dir}"; then
-      local zshrc="${HOME}/.zshrc"
+      zshrc="${HOME}/.zshrc"
       if [[ -f "$zshrc" ]] && grep -qF 'fpath=(~/.local/share/zsh/site-functions' "$zshrc" 2>/dev/null; then
         : # already present
       else
+        # shellcheck disable=SC2016  # intentional: $fpath is zsh code written to .zshrc
         printf '\nfpath=(~/.local/share/zsh/site-functions $fpath)\n' >> "$zshrc"
         printf "  ${GREEN}✓${RESET} Added fpath to %s\n" "$zshrc"
       fi
