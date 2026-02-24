@@ -27,7 +27,7 @@ _git-wt() {
       _describe 'command' subcommands
       ;;
     args)
-      case "${words[1]}" in
+      case "${line[1]}" in
         new)
           _arguments \
             '(-b --base)'{-b,--base}'[Base branch to fork from]:branch:__git_branch_names' \
@@ -45,12 +45,9 @@ _git-wt() {
 }
 
 _git_wt_names() {
-  local wt_dir="${GIT_WT_HOME:-$HOME/.git-wt}/$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null)"
-  if [[ -d "$wt_dir" ]]; then
-    local -a names
-    names=("${(@f)$(command ls "$wt_dir" 2>/dev/null)}")
-    _describe 'worktree' names
-  fi
+  local -a names
+  names=("${(@f)$(git wt _names 2>/dev/null)}")
+  (( ${#names} )) && _describe 'worktree' names
 }
 
 __git_branch_names() {
