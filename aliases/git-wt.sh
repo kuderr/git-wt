@@ -24,12 +24,16 @@ wto() {
 #   wtn                  (auto-generated name)
 #   wtn -b main hotfix
 wtn() {
-  local output
+  local output line path
   output=$(git wt new "$@") || return 1
   echo "$output"
-  local path
-  path=$(echo "$output" | grep 'Path:' | awk '{print $2}')
-  [[ -n "$path" ]] && cd "$path" || return 1
+  while IFS= read -r line; do
+    if [[ "$line" == *"Path:"* ]]; then
+      read -r path <<< "${line##*Path:}"
+      break
+    fi
+  done <<< "$output"
+  [[ -n "${path:-}" ]] && cd "$path" || return 1
 }
 
 # List worktrees (current repo)
