@@ -88,7 +88,7 @@ This way your dev server starts immediately without missing config.
 
 ### AI session preservation
 
-AI tools (Claude Code, Codex) store sessions and settings per project path. When a worktree is deleted, that data is normally lost. Use `--copy-ai` to preserve it:
+AI tools like Claude Code store sessions and settings per project path. When a worktree is deleted, that data is normally lost. Use `--copy-ai` to preserve it:
 
 ```bash
 # On create: copies .claude/settings.local.json into worktree

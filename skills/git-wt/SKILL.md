@@ -98,7 +98,7 @@ Use `git wt new --copy-env` when:
 - The worktree needs the same configuration as the main repo
 
 Use `git wt new --copy-ai` when:
-- Working with Claude Code, Codex, or other AI tools in worktrees
+- Working with Claude Code or other AI tools in worktrees
 - You want approved commands (`.claude/settings.local.json`) available immediately
 - You want Claude sessions archived (not lost) when the worktree is removed
 
