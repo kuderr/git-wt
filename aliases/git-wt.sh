@@ -36,6 +36,23 @@ wtn() {
   [[ -n "${wt_path:-}" ]] && cd "$wt_path" || return 1
 }
 
+# Check out an existing branch into a worktree and cd into it
+#   wtco feature/login
+#   wtco origin/fix/bug-42
+#   wtco feature/login my-name
+wtco() {
+  local output line wt_path
+  output=$(git wt checkout "$@") || return 1
+  echo "$output"
+  while IFS= read -r line; do
+    if [[ "$line" == *"Path:"* ]]; then
+      read -r wt_path <<< "${line##*Path:}"
+      break
+    fi
+  done <<< "$output"
+  [[ -n "${wt_path:-}" ]] && cd "$wt_path" || return 1
+}
+
 # List worktrees (current repo)
 alias wtls='git wt list'
 
@@ -59,11 +76,13 @@ if [[ -n "${ZSH_VERSION:-}" ]]; then
   # zsh: reuse git-wt completions for worktree-name arguments
   _wtcd()    { compadd -- $(git wt _names 2>/dev/null); }
   _wtn()     { _arguments '*:branch:_git_branch_names'; }
+  _wtco()    { compadd -- $(git branch --all --format='%(refname:short)' 2>/dev/null); }
   _wtrm()    { compadd -- $(git wt _names 2>/dev/null); }
   _wtopen()  { compadd -- $(git wt _names 2>/dev/null); }
   _wtpath()  { compadd -- $(git wt _names 2>/dev/null); }
 
   compdef _wtcd wtcd
+  compdef _wtco wtco
   compdef _wtrm wtrm
   compdef _wtopen wtopen
   compdef _wtpath wtpath
@@ -74,7 +93,13 @@ elif [[ -n "${BASH_VERSION:-}" ]]; then
     COMPREPLY=( $(compgen -W "$(git wt _names 2>/dev/null)" -- "$cur") )
   }
 
+  _wt_branch_complete() {
+    local cur="${COMP_WORDS[COMP_CWORD]}"
+    COMPREPLY=( $(compgen -W "$(git branch --all --format='%(refname:short)' 2>/dev/null)" -- "$cur") )
+  }
+
   complete -F _wt_alias_complete wtcd
+  complete -F _wt_branch_complete wtco
   complete -F _wt_alias_complete wtrm
   complete -F _wt_alias_complete wtopen
   complete -F _wt_alias_complete wtpath
