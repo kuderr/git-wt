@@ -105,7 +105,7 @@ git wt rm my-feature
 **What happens:**
 - **On create**: copies `.claude/settings.local.json` (approved commands) into the worktree
 - **On remove**: archives Claude Code sessions to `~/.git-wt/<repo>/.ai-sessions/<name>/`, syncs settings back to origin
-- **Codex**: registered as provider stub (sessions are global, local `.codex/` has symlinks that can't be copied)
+- **Extensible**: add new providers via `GIT_WT_AI_PROVIDERS` (define `_ai_copy_<name>` + `_ai_save_<name>` functions in the script)
 
 To enable this permanently:
 
@@ -176,7 +176,7 @@ Global flags:
 | `GIT_WT_HOME` | `~/.git-wt` | Root directory for all worktrees |
 | `GIT_WT_PREFIX` | `wt` | Branch name prefix |
 | `GIT_WT_COPY_AI` | `false` | Always copy AI configs on new, save sessions on rm |
-| `GIT_WT_AI_PROVIDERS` | `claude codex` | Space-separated list of AI providers to manage |
+| `GIT_WT_AI_PROVIDERS` | `claude` | Space-separated list of AI providers to manage |
 
 ## Shell Completions
 

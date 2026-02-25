@@ -187,7 +187,7 @@ _claude_project_id() { echo "${1//\//-}"; }
 _ai_copy_all() {
   local origin="$1" wt_path="$2"
   local provider
-  for provider in ${GIT_WT_AI_PROVIDERS:-claude codex}; do
+  for provider in ${GIT_WT_AI_PROVIDERS:-claude}; do
     if declare -f "_ai_copy_${provider}" >/dev/null 2>&1; then
       "_ai_copy_${provider}" "$origin" "$wt_path"
     fi
@@ -199,7 +199,7 @@ _ai_copy_all() {
 _ai_save_all() {
   local wt_path="$1" wt_name="$2" archive_dir="$3" origin="$4"
   local provider
-  for provider in ${GIT_WT_AI_PROVIDERS:-claude codex}; do
+  for provider in ${GIT_WT_AI_PROVIDERS:-claude}; do
     if declare -f "_ai_save_${provider}" >/dev/null 2>&1; then
       "_ai_save_${provider}" "$wt_path" "$wt_name" "$archive_dir" "$origin"
     fi
@@ -241,20 +241,6 @@ _ai_save_claude() {
       info "  Synced .claude/settings.local.json → origin"
     fi
   fi
-}
-
-# --- Provider: Codex ---
-# Codex sessions are date-based (global, not per-path) — no archival needed.
-# Local .codex/skills/ contains relative symlinks that break when copied to
-# a different path. Trust levels live in global ~/.codex/config.toml.
-# Stub: expand when Codex adds per-project settings.
-
-_ai_copy_codex() {
-  true
-}
-
-_ai_save_codex() {
-  true
 }
 
 # --- Commands ---
@@ -647,7 +633,7 @@ ${BOLD}Environment:${RESET}
   GIT_WT_HOME              Worktrees root (default: ~/.git-wt)
   GIT_WT_PREFIX            Default branch prefix (default: wt)
   GIT_WT_COPY_AI           Always copy AI configs on new, save on rm (default: false)
-  GIT_WT_AI_PROVIDERS      Space-separated AI providers (default: "claude codex")
+  GIT_WT_AI_PROVIDERS      Space-separated AI providers (default: "claude")
 
 ${BOLD}Examples:${RESET}
   git wt new                       ${DIM}# ~/.git-wt/myrepo/swift-jade/${RESET}

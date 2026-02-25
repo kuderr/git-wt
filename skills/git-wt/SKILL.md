@@ -83,7 +83,7 @@ git wt clean                         # Remove all managed worktrees for current 
 - `GIT_WT_HOME` — Root directory for all worktrees (default: `~/.git-wt`)
 - `GIT_WT_PREFIX` — Branch name prefix (default: `wt`)
 - `GIT_WT_COPY_AI` — Always copy AI configs on new, save sessions on rm (default: `false`)
-- `GIT_WT_AI_PROVIDERS` — Space-separated AI providers to manage (default: `claude codex`)
+- `GIT_WT_AI_PROVIDERS` — Space-separated AI providers to manage (default: `claude`)
 
 ## When to Use
 
