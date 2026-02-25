@@ -91,7 +91,7 @@ This way your dev server starts immediately without missing config.
 AI tools (Claude Code, Codex) store sessions and settings per project path. When a worktree is deleted, that data is normally lost. Use `--copy-ai` to preserve it:
 
 ```bash
-# On create: copies .claude/settings.local.json and .codex/ into worktree
+# On create: copies .claude/settings.local.json into worktree
 git wt new --copy-ai my-feature
 
 # Work in the worktree — AI tools create sessions, you approve new commands...
@@ -103,8 +103,9 @@ git wt rm my-feature
 ```
 
 **What happens:**
-- **On create**: copies `.claude/settings.local.json` (approved commands) and `.codex/` (skills) into the worktree
-- **On remove**: archives Claude Code sessions to `~/.git-wt/<repo>/.ai-sessions/<name>/`, copies settings back to origin
+- **On create**: copies `.claude/settings.local.json` (approved commands) into the worktree
+- **On remove**: archives Claude Code sessions to `~/.git-wt/<repo>/.ai-sessions/<name>/`, syncs settings back to origin
+- **Codex**: registered as provider stub (sessions are global, local `.codex/` has symlinks that can't be copied)
 
 To enable this permanently:
 
@@ -160,7 +161,7 @@ Options for `git wt new`:
 | `-p, --prefix <prefix>` | Branch prefix (default: `wt`) |
 | `--no-branch` | Create with detached HEAD instead of a new branch |
 | `--copy-env` | Copy `.env*` files from the repo root into the worktree |
-| `--copy-ai` | Copy AI agent configs (`.claude/`, `.codex/`) and save sessions on rm |
+| `--copy-ai` | Copy AI agent configs and save sessions on rm |
 
 Global flags:
 

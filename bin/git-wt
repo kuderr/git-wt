@@ -244,28 +244,17 @@ _ai_save_claude() {
 }
 
 # --- Provider: Codex ---
+# Codex sessions are date-based (global, not per-path) — no archival needed.
+# Local .codex/skills/ contains relative symlinks that break when copied to
+# a different path. Trust levels live in global ~/.codex/config.toml.
+# Stub: expand when Codex adds per-project settings.
 
 _ai_copy_codex() {
-  local origin="$1" wt_path="$2"
-  if [[ -d "${origin}/.codex" ]]; then
-    cp -r "${origin}/.codex" "${wt_path}/.codex"
-    info "  Copied .codex/"
-  fi
+  true
 }
 
 _ai_save_codex() {
-  local wt_path="$1" wt_name="$2" archive_dir="$3" origin="$4"
-
-  # Codex sessions are date-based (not per-path), no archival needed.
-  # Sync local .codex/ changes back to origin (skills, etc.)
-  if [[ -d "${wt_path}/.codex" ]]; then
-    if [[ -d "${origin}/.codex" ]]; then
-      mkdir -p "${archive_dir}/codex"
-      cp -r "${wt_path}/.codex" "${archive_dir}/codex/local"
-    fi
-    cp -r "${wt_path}/.codex/"* "${origin}/.codex/" 2>/dev/null || true
-    info "  Synced .codex/ → origin"
-  fi
+  true
 }
 
 # --- Commands ---
@@ -652,8 +641,7 @@ ${BOLD}Options for new:${RESET}
   -p, --prefix <prefix>    Branch prefix (default: wt/)
   --no-branch              Use detached HEAD
   --copy-env               Copy .env* files into new worktree
-  --copy-ai                Copy AI agent configs (.claude/, .codex/) and
-                           save sessions on rm
+  --copy-ai                Copy AI agent configs and save sessions on rm
 
 ${BOLD}Environment:${RESET}
   GIT_WT_HOME              Worktrees root (default: ~/.git-wt)
