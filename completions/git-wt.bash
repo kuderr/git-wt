@@ -12,7 +12,7 @@ _git_wt() {
   for ((i = 1; i < COMP_CWORD; i++)); do
     case "${COMP_WORDS[i]}" in
       -q|--quiet) continue ;;
-      new|list|list-all|ls|rm|remove|path|cd|origin|open|adopt|clean|help|version|--version|-v)
+      new|checkout|co|list|list-all|ls|rm|remove|path|cd|origin|open|adopt|clean|help|version|--version|-v)
         subcmd="${COMP_WORDS[i]}"
         break
         ;;
@@ -24,7 +24,7 @@ _git_wt() {
     if [[ "$cur" == -* ]]; then
       COMPREPLY=($(compgen -W "-q --quiet --help --version" -- "$cur"))
     else
-      COMPREPLY=($(compgen -W "new list list-all adopt rm path origin open clean help version" -- "$cur"))
+      COMPREPLY=($(compgen -W "new checkout list list-all adopt rm path origin open clean help version" -- "$cur"))
     fi
     return
   fi
@@ -59,6 +59,16 @@ _git_wt() {
           fi
           ;;
       esac
+      ;;
+    checkout|co)
+      if [[ "$cur" == -* ]]; then
+        COMPREPLY=($(compgen -W "--copy-env --copy-ai" -- "$cur"))
+      else
+        # Complete with local + remote branch names
+        local branches
+        branches=$(git branch --all --format='%(refname:short)' 2>/dev/null)
+        COMPREPLY=($(compgen -W "$branches" -- "$cur"))
+      fi
       ;;
   esac
 }

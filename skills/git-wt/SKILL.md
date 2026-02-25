@@ -30,6 +30,15 @@ git wt new --copy-ai my-feature      # Copy AI configs, save sessions on rm
 git wt new --no-branch scratch       # Detached HEAD (no branch created)
 ```
 
+### Check out an existing branch
+```bash
+git wt checkout feature/login           # Local branch → worktree
+git wt checkout origin/fix/bug-42       # Remote → local tracking branch → worktree
+git wt checkout fix/bug-42              # Auto-detects from remote
+git wt checkout feature/login my-fix    # Custom worktree name
+git wt checkout --copy-env feature/api  # Also copy .env files
+```
+
 ### Navigate to a worktree
 ```bash
 cd $(git wt path <name>)             # Jump into worktree
@@ -74,6 +83,7 @@ git wt clean                         # Remove all managed worktrees for current 
 - **`rm`**: only works on managed worktrees — removes directory and deletes its branch
 - **`adopt`**: moves an external worktree under `~/.git-wt/` so git-wt fully manages it
 - **External worktrees**: `list`, `path`, `open` work with worktrees created outside git-wt
+- **`checkout`**: checks out an existing branch (local or remote) into a managed worktree — does NOT create new branches
 - **`--copy-env`**: copies all `.env*` files from repo root (critical for dev servers)
 - **`--copy-ai`**: copies AI configs on create, archives sessions + syncs settings on rm
 - **`origin`**: prints main repo path — works from any worktree or main repo itself
@@ -102,6 +112,11 @@ Use `git wt new --copy-ai` when:
 - You want approved commands (`.claude/settings.local.json`) available immediately
 - You want Claude sessions archived (not lost) when the worktree is removed
 
+Use `git wt checkout` when:
+- You need to work on an existing branch in an isolated worktree
+- You want to check out a remote branch without manually creating a tracking branch
+- You're reviewing someone else's PR branch in isolation
+
 Use `git wt adopt` when:
 - A worktree was created with `git worktree add` and you want git-wt to manage it
 - You want the worktree moved to `~/.git-wt/` for consistent management
@@ -115,6 +130,7 @@ Optional `aliases/git-wt.sh` provides shorter commands. Source it in `.bashrc`/`
 | `wtcd <name>` | `cd` into a worktree |
 | `wto` | `cd` to the origin (main) repo |
 | `wtn [name]` | Create worktree + `cd` into it |
+| `wtco <branch>` | Checkout existing branch + `cd` into it |
 | `wtls` / `wtla` | List / list-all |
 | `wtrm` / `wtopen` / `wtclean` / `wtpath` | Shorthand for corresponding commands |
 

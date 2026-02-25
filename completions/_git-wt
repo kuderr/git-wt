@@ -5,6 +5,7 @@ _git-wt() {
   local -a subcommands
   subcommands=(
     'new:Create a new worktree'
+    'checkout:Check out existing branch into a worktree'
     'list:List worktrees for current repo'
     'list-all:List managed worktrees across all repos'
     'adopt:Adopt an external worktree into git-wt'
@@ -37,6 +38,13 @@ _git-wt() {
             '--copy-ai[Copy AI agent configs and save sessions on rm]' \
             ':name:'
           ;;
+        checkout|co)
+          _arguments \
+            '--copy-env[Copy .env files into worktree]' \
+            '--copy-ai[Copy AI agent configs and save sessions on rm]' \
+            ':branch:__git_branch_names_all' \
+            ':name:'
+          ;;
         adopt)
           _arguments \
             ':path:_directories' \
@@ -59,6 +67,12 @@ _git_wt_names() {
 __git_branch_names() {
   local -a branches
   branches=("${(@f)$(git branch --format='%(refname:short)' 2>/dev/null)}")
+  _describe 'branch' branches
+}
+
+__git_branch_names_all() {
+  local -a branches
+  branches=("${(@f)$(git branch --all --format='%(refname:short)' 2>/dev/null)}")
   _describe 'branch' branches
 }
 

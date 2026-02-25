@@ -112,11 +112,33 @@ git wt adopt ../my-hotfix       # or by path
 
 After `adopt`, the worktree is managed by git-wt like any other.
 
+### Checking out existing branches
+
+Use `checkout` when the branch already exists (locally or on a remote):
+
+```bash
+# Local branch → worktree
+git wt checkout feature/login
+
+# Remote branch → creates local tracking branch → worktree
+git wt checkout origin/fix/bug-42
+
+# Branch on remote, auto-detected (no prefix needed)
+git wt checkout fix/bug-42
+
+# Custom worktree name
+git wt checkout feature/login my-login-fix
+```
+
+Worktree names are derived from the branch name (slashes become dashes, remote prefix stripped).
+Use `git wt new` when you need a **new** branch.
+
 ## Commands
 
 | Command | Description |
 |---------|-------------|
 | `git wt new [name]` | Create a new worktree. Auto-generates a name if omitted. |
+| `git wt checkout <branch> [name]` | Check out an existing branch into a worktree. |
 | `git wt list` | List all worktrees for the current repo (managed + external). |
 | `git wt list-all` | List managed worktrees across **all** repos. |
 | `git wt adopt <name\|path> [name]` | Adopt an external worktree into git-wt management. |
@@ -137,6 +159,13 @@ Options for `git wt new`:
 | `-b, --base <branch>` | Branch to fork from (default: current branch) |
 | `-p, --prefix <prefix>` | Branch prefix (default: `wt`) |
 | `--no-branch` | Create with detached HEAD instead of a new branch |
+| `--copy-env` | Copy `.env*` files from the repo root into the worktree |
+| `--copy-ai` | Copy AI agent configs and save sessions on rm |
+
+Options for `git wt checkout`:
+
+| Flag | Description |
+|------|-------------|
 | `--copy-env` | Copy `.env*` files from the repo root into the worktree |
 | `--copy-ai` | Copy AI agent configs and save sessions on rm |
 
@@ -288,6 +317,7 @@ source /path/to/git-wt/aliases/git-wt.sh
 | `wtcd <name>` | `cd $(git wt path <name>)` | cd into a worktree |
 | `wto` | `cd $(git wt origin)` | cd into the origin (main) repo |
 | `wtn [name]` | `git wt new` + `cd` | Create worktree and cd into it |
+| `wtco <branch>` | `git wt checkout` + `cd` | Checkout existing branch and cd into it |
 | `wtls` | `git wt list` | List worktrees |
 | `wtla` | `git wt list-all` | List all worktrees |
 | `wtrm <name>` | `git wt rm` | Remove a worktree |

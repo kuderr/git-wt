@@ -8,7 +8,7 @@
 # shellcheck disable=SC2059  # intentional: ANSI color codes in printf format strings
 set -euo pipefail
 
-GIT_WT_VERSION="1.3.0"
+GIT_WT_VERSION="1.5.0"
 
 # --- Config ---
 GIT_WT_HOME="${GIT_WT_HOME:-${HOME}/.git-wt}"
@@ -90,6 +90,68 @@ resolve_wt_dir() {
 
 current_branch() {
   git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "HEAD"
+}
+
+# Convert branch name to worktree directory name.
+# Strips remote prefix, replaces slashes with dashes.
+#   origin/fix/bug-42 → fix-bug-42
+#   feature/login     → feature-login
+branch_to_wt_name() {
+  local branch="$1"
+  local remote
+  for remote in $(git remote 2>/dev/null); do
+    if [[ "$branch" == "${remote}/"* ]]; then
+      branch="${branch#"${remote}/"}"
+      break
+    fi
+  done
+  echo "${branch//\//-}"
+}
+
+# Resolve a branch for checkout. Returns type:local_branch:remote_ref
+# Types: local (exists in refs/heads), remote (explicit origin/... ref), auto (found on one remote)
+resolve_checkout_branch() {
+  local input="$1"
+
+  # Case 1: Explicit remote ref (e.g., origin/fix/bug-42)
+  local remote
+  for remote in $(git remote 2>/dev/null); do
+    if [[ "$input" == "${remote}/"* ]]; then
+      local local_branch="${input#"${remote}/"}"
+      if ! git show-ref --verify --quiet "refs/remotes/${input}"; then
+        die "remote branch '${input}' not found"
+      fi
+      # If local tracking branch already exists, use it directly
+      if git show-ref --verify --quiet "refs/heads/${local_branch}"; then
+        echo "local:${local_branch}:"
+      else
+        echo "remote:${local_branch}:${input}"
+      fi
+      return 0
+    fi
+  done
+
+  # Case 2: Local branch exists
+  if git show-ref --verify --quiet "refs/heads/${input}"; then
+    echo "local:${input}:"
+    return 0
+  fi
+
+  # Case 3: Search on all remotes
+  local matches=()
+  local ref
+  while IFS= read -r ref; do
+    [[ -n "$ref" ]] && matches+=("$ref")
+  done < <(git for-each-ref --format='%(refname:short)' "refs/remotes/*/${input}")
+
+  if [[ ${#matches[@]} -eq 1 ]]; then
+    echo "auto:${input}:${matches[0]}"
+    return 0
+  elif [[ ${#matches[@]} -gt 1 ]]; then
+    die "branch '${input}' exists on multiple remotes: ${matches[*]}\nSpecify the remote explicitly, e.g., origin/${input}"
+  fi
+
+  die "branch '${input}' not found (checked local branches and remotes)"
 }
 
 # Resolve a worktree name or path to its absolute path.
@@ -310,6 +372,91 @@ cmd_new() {
   if ! $WT_NO_BRANCH; then
     printf "  Branch: %s\n" "${branch}"
   fi
+  echo ""
+  printf "  ${DIM}cd %s${RESET}\n" "${wt_path}"
+}
+
+cmd_checkout() {
+  local branch=""
+  local name=""
+  local positional=()
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --copy-env)   WT_COPY_ENV=true; shift ;;
+      --copy-ai)    WT_COPY_AI=true; shift ;;
+      -*)           die "unknown option: $1" ;;
+      *)            positional+=("$1"); shift ;;
+    esac
+  done
+
+  branch="${positional[0]:-}"
+  if [[ -z "$branch" ]]; then
+    die "usage: git wt checkout <branch> [name]"
+  fi
+  name="${positional[1]:-$(branch_to_wt_name "$branch")}"
+
+  local wt_root
+  wt_root=$(resolve_wt_dir)
+  local wt_path="${wt_root}/${name}"
+
+  if [[ -d "$wt_path" ]]; then
+    die "worktree '${name}' already exists at ${wt_path}"
+  fi
+
+  # Resolve branch: local, remote-explicit, or auto-detect
+  local resolution
+  resolution=$(resolve_checkout_branch "$branch")
+  local res_type="${resolution%%:*}"
+  local rest="${resolution#*:}"
+  local local_branch="${rest%%:*}"
+  local remote_ref="${rest#*:}"
+
+  mkdir -p "$wt_root"
+
+  case "$res_type" in
+    local)
+      info "Checking out branch '${local_branch}' into worktree '${name}'..."
+      git worktree add "$wt_path" "$local_branch"
+      ;;
+    remote)
+      info "Checking out '${remote_ref}' into worktree '${name}' (tracking branch '${local_branch}')..."
+      git worktree add --track -b "$local_branch" "$wt_path" "$remote_ref"
+      ;;
+    auto)
+      info "Checking out branch '${local_branch}' into worktree '${name}' (from ${remote_ref})..."
+      git worktree add "$wt_path" "$local_branch"
+      ;;
+  esac
+
+  # Copy env files if requested
+  if $WT_COPY_ENV; then
+    local repo_root
+    repo_root=$(get_repo_root)
+    local copied=0
+    for envfile in "${repo_root}"/.env*; do
+      if [[ -f "$envfile" ]]; then
+        cp "$envfile" "$wt_path/"
+        $WT_QUIET || printf "  Copied %s\n" "$(basename "$envfile")"
+        copied=$((copied + 1))
+      fi
+    done
+    if [[ $copied -eq 0 ]]; then
+      warn "no .env* files found to copy"
+    fi
+  fi
+
+  # Copy AI agent configs if requested
+  if [[ "$WT_COPY_AI" == "true" ]]; then
+    local ai_origin
+    ai_origin=$(get_repo_root)
+    _ai_copy_all "$ai_origin" "$wt_path"
+  fi
+
+  echo ""
+  printf "${BOLD}Worktree ready:${RESET}\n"
+  printf "  Path:   %s\n" "${wt_path}"
+  printf "  Branch: %s\n" "${local_branch}"
   echo ""
   printf "  ${DIM}cd %s${RESET}\n" "${wt_path}"
 }
@@ -611,6 +758,7 @@ Worktrees are stored in ${DIM}${GIT_WT_HOME}/<repo>/<name>/${RESET}
 
 ${BOLD}Usage:${RESET}
   git wt new [name]            Create a new worktree (auto-names if omitted)
+  git wt checkout <branch> [name]  Check out existing branch into a worktree
   git wt list                  List worktrees for current repo
   git wt list-all              List managed worktrees across all repos
   git wt adopt <name|path> [name]  Adopt an external worktree into git-wt
@@ -627,6 +775,10 @@ ${BOLD}Options for new:${RESET}
   --copy-env               Copy .env* files into new worktree
   --copy-ai                Copy AI agent configs and save sessions on rm
 
+${BOLD}Options for checkout:${RESET}
+  --copy-env               Copy .env* files into worktree
+  --copy-ai                Copy AI agent configs and save sessions on rm
+
 ${BOLD}Environment:${RESET}
   GIT_WT_HOME              Worktrees root (default: ~/.git-wt)
   GIT_WT_PREFIX            Default branch prefix (default: wt)
@@ -641,6 +793,9 @@ ${BOLD}Examples:${RESET}
   git wt new -b main hotfix        ${DIM}# fork from main${RESET}
   git wt new --copy-env experiment ${DIM}# also copies .env files${RESET}
   git wt new --copy-ai feature     ${DIM}# copies AI configs, saves sessions on rm${RESET}
+  git wt checkout feature/login    ${DIM}# existing branch → worktree${RESET}
+  git wt checkout origin/fix/bug   ${DIM}# remote → tracking branch → worktree${RESET}
+  git wt checkout fix/api my-fix   ${DIM}# custom worktree name${RESET}
   cd \$(git wt path my-feature)     ${DIM}# jump into worktree${RESET}
   git wt open my-feature           ${DIM}# open in Cursor/VS Code${RESET}
   git wt adopt ../my-hotfix        ${DIM}# adopt external worktree${RESET}
@@ -664,6 +819,7 @@ shift || true
 
 case "$command" in
   new)              cmd_new "$@" ;;
+  checkout|co)      cmd_checkout "$@" ;;
   list|ls)          cmd_list "$@" ;;
   list-all)         cmd_list_all "$@" ;;
   rm|remove)        cmd_rm "$@" ;;

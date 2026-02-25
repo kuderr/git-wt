@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.5.0] - 2026-02-25
+
+### Added
+- `git wt checkout <branch> [name]` — check out an existing local or remote branch into a worktree
+- Auto-detects remote tracking branches (e.g., `git wt checkout fix/bug-42` finds `origin/fix/bug-42`)
+- Explicit remote refs supported (e.g., `git wt checkout origin/fix/bug-42`)
+- `co` alias for `checkout` (like `git checkout` → `git co`)
+- `wtco` shell alias — checkout + cd in one step
+- `--copy-env` and `--copy-ai` flags supported for checkout
+
 ## [1.4.0] - 2026-02-25
 
 ### Added
