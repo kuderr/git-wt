@@ -34,6 +34,7 @@ _git-wt() {
             '(-p --prefix)'{-p,--prefix}'[Branch prefix]:prefix:' \
             '--no-branch[Use detached HEAD]' \
             '--copy-env[Copy .env files into worktree]' \
+            '--copy-ai[Copy AI agent configs and save sessions on rm]' \
             ':name:'
           ;;
         adopt)

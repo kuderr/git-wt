@@ -8,7 +8,7 @@
 # shellcheck disable=SC2059  # intentional: ANSI color codes in printf format strings
 set -euo pipefail
 
-GIT_WT_VERSION="1.2.0"
+GIT_WT_VERSION="1.3.0"
 
 # --- Config ---
 GIT_WT_HOME="${GIT_WT_HOME:-${HOME}/.git-wt}"
@@ -16,6 +16,7 @@ WT_PREFIX="${GIT_WT_PREFIX:-wt}"
 WT_BASE=""
 WT_NO_BRANCH=false
 WT_COPY_ENV=false
+WT_COPY_AI="${GIT_WT_COPY_AI:-false}"
 WT_QUIET=false
 
 # --- Colors (respect NO_COLOR and non-tty) ---
@@ -176,6 +177,97 @@ _wt_names() {
   done < <(git worktree list --porcelain 2>/dev/null && echo "")
 }
 
+# --- AI provider integration ---
+# Extensible system: add _ai_copy_<name> + _ai_save_<name> functions for new providers.
+
+# Encode absolute path to Claude project ID: /a/b/c → -a-b-c
+_claude_project_id() { echo "${1//\//-}"; }
+
+# Copy AI configs from origin to new worktree
+_ai_copy_all() {
+  local origin="$1" wt_path="$2"
+  local provider
+  for provider in ${GIT_WT_AI_PROVIDERS:-claude codex}; do
+    if declare -f "_ai_copy_${provider}" >/dev/null 2>&1; then
+      "_ai_copy_${provider}" "$origin" "$wt_path"
+    fi
+  done
+  touch "$wt_path/.git-wt-ai-sync"
+}
+
+# Save AI data before worktree removal
+_ai_save_all() {
+  local wt_path="$1" wt_name="$2" archive_dir="$3" origin="$4"
+  local provider
+  for provider in ${GIT_WT_AI_PROVIDERS:-claude codex}; do
+    if declare -f "_ai_save_${provider}" >/dev/null 2>&1; then
+      "_ai_save_${provider}" "$wt_path" "$wt_name" "$archive_dir" "$origin"
+    fi
+  done
+}
+
+# --- Provider: Claude Code ---
+
+_ai_copy_claude() {
+  local origin="$1" wt_path="$2"
+  local src="${origin}/.claude/settings.local.json"
+  if [[ -f "$src" ]]; then
+    mkdir -p "${wt_path}/.claude"
+    cp "$src" "${wt_path}/.claude/"
+    info "  Copied .claude/settings.local.json"
+  fi
+}
+
+_ai_save_claude() {
+  local wt_path="$1" wt_name="$2" archive_dir="$3" origin="$4"
+
+  # Archive sessions from ~/.claude/projects/<encoded-path>/
+  local project_id
+  project_id=$(_claude_project_id "$wt_path")
+  local claude_project="${HOME}/.claude/projects/${project_id}"
+  if [[ -d "$claude_project" ]]; then
+    mkdir -p "${archive_dir}/claude"
+    mv "$claude_project" "${archive_dir}/claude/sessions"
+    info "  Archived Claude sessions → .ai-sessions/${wt_name}/claude/"
+  fi
+
+  # Sync settings.local.json back to origin if changed
+  local wt_settings="${wt_path}/.claude/settings.local.json"
+  local origin_settings="${origin}/.claude/settings.local.json"
+  if [[ -f "$wt_settings" ]]; then
+    if [[ ! -f "$origin_settings" ]] || ! diff -q "$wt_settings" "$origin_settings" >/dev/null 2>&1; then
+      mkdir -p "${origin}/.claude"
+      cp "$wt_settings" "$origin_settings"
+      info "  Synced .claude/settings.local.json → origin"
+    fi
+  fi
+}
+
+# --- Provider: Codex ---
+
+_ai_copy_codex() {
+  local origin="$1" wt_path="$2"
+  if [[ -d "${origin}/.codex" ]]; then
+    cp -r "${origin}/.codex" "${wt_path}/.codex"
+    info "  Copied .codex/"
+  fi
+}
+
+_ai_save_codex() {
+  local wt_path="$1" wt_name="$2" archive_dir="$3" origin="$4"
+
+  # Codex sessions are date-based (not per-path), no archival needed.
+  # Sync local .codex/ changes back to origin (skills, etc.)
+  if [[ -d "${wt_path}/.codex" ]]; then
+    if [[ -d "${origin}/.codex" ]]; then
+      mkdir -p "${archive_dir}/codex"
+      cp -r "${wt_path}/.codex" "${archive_dir}/codex/local"
+    fi
+    cp -r "${wt_path}/.codex/"* "${origin}/.codex/" 2>/dev/null || true
+    info "  Synced .codex/ → origin"
+  fi
+}
+
 # --- Commands ---
 cmd_new() {
   local name=""
@@ -187,6 +279,7 @@ cmd_new() {
       -p|--prefix)  WT_PREFIX="$2"; shift 2 ;;
       --no-branch)  WT_NO_BRANCH=true; shift ;;
       --copy-env)   WT_COPY_ENV=true; shift ;;
+      --copy-ai)    WT_COPY_AI=true; shift ;;
       -*)           die "unknown option: $1" ;;
       *)            positional+=("$1"); shift ;;
     esac
@@ -229,6 +322,13 @@ cmd_new() {
     if [[ $copied -eq 0 ]]; then
       warn "no .env* files found to copy"
     fi
+  fi
+
+  # Copy AI agent configs if requested
+  if [[ "$WT_COPY_AI" == "true" ]]; then
+    local ai_origin
+    ai_origin=$(get_repo_root)
+    _ai_copy_all "$ai_origin" "$wt_path"
   fi
 
   echo ""
@@ -359,6 +459,14 @@ cmd_rm() {
   # Get branch name before removing
   local branch
   branch=$(cd "$wt_path" && git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+
+  # Save AI agent data before removal
+  if [[ -f "$wt_path/.git-wt-ai-sync" ]] || [[ "$WT_COPY_AI" == "true" ]]; then
+    local archive_dir="${wt_root}/.ai-sessions/${name}"
+    local repo_root
+    repo_root=$(get_repo_root)
+    _ai_save_all "$wt_path" "$name" "$archive_dir" "$repo_root"
+  fi
 
   info "Removing worktree '${name}'..."
   git worktree remove "$wt_path" --force
@@ -544,16 +652,21 @@ ${BOLD}Options for new:${RESET}
   -p, --prefix <prefix>    Branch prefix (default: wt/)
   --no-branch              Use detached HEAD
   --copy-env               Copy .env* files into new worktree
+  --copy-ai                Copy AI agent configs (.claude/, .codex/) and
+                           save sessions on rm
 
 ${BOLD}Environment:${RESET}
   GIT_WT_HOME              Worktrees root (default: ~/.git-wt)
   GIT_WT_PREFIX            Default branch prefix (default: wt)
+  GIT_WT_COPY_AI           Always copy AI configs on new, save on rm (default: false)
+  GIT_WT_AI_PROVIDERS      Space-separated AI providers (default: "claude codex")
 
 ${BOLD}Examples:${RESET}
   git wt new                       ${DIM}# ~/.git-wt/myrepo/swift-jade/${RESET}
   git wt new my-feature            ${DIM}# ~/.git-wt/myrepo/my-feature/${RESET}
   git wt new -b main hotfix        ${DIM}# fork from main${RESET}
   git wt new --copy-env experiment ${DIM}# also copies .env files${RESET}
+  git wt new --copy-ai feature     ${DIM}# copies AI configs, saves sessions on rm${RESET}
   cd \$(git wt path my-feature)     ${DIM}# jump into worktree${RESET}
   git wt open my-feature           ${DIM}# open in Cursor/VS Code${RESET}
   git wt adopt ../my-hotfix        ${DIM}# adopt external worktree${RESET}

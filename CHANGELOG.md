@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.3.0] - 2026-02-25
+
+### Added
+- `--copy-ai` flag for `git wt new` — copies AI agent configs (`.claude/`, `.codex/`) into worktree
+- AI session preservation on `git wt rm` — archives Claude Code sessions, syncs settings back to origin
+- Extensible provider system (`GIT_WT_AI_PROVIDERS`) — add support for new AI tools by defining `_ai_copy_<name>` and `_ai_save_<name>` functions
+- `GIT_WT_COPY_AI` environment variable to permanently enable AI integration
+- `GIT_WT_AI_PROVIDERS` environment variable to control which AI tools are managed (default: `claude codex`)
+
 ## [1.2.0] - 2026-02-24
 
 ### Added
