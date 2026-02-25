@@ -73,35 +73,6 @@ git wt open auth-refactor
 git wt rm auth-refactor
 ```
 
-### Shell Aliases
-
-Install the optional aliases for shorter commands:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/kuderr/git-wt/main/aliases/install.sh | bash
-```
-
-Or source manually:
-
-```bash
-# Add to ~/.bashrc or ~/.zshrc
-source /path/to/git-wt/aliases/git-wt.sh
-```
-
-| Alias | Equivalent | Description |
-|-------|-----------|-------------|
-| `wtcd <name>` | `cd $(git wt path <name>)` | cd into a worktree |
-| `wto` | `cd $(git wt origin)` | cd into the origin (main) repo |
-| `wtn [name]` | `git wt new` + `cd` | Create worktree and cd into it |
-| `wtls` | `git wt list` | List worktrees |
-| `wtla` | `git wt list-all` | List all worktrees |
-| `wtrm <name>` | `git wt rm` | Remove a worktree |
-| `wtopen <name>` | `git wt open` | Open worktree in editor |
-| `wtclean` | `git wt clean` | Remove all worktrees |
-| `wtpath <name>` | `git wt path` | Print worktree path |
-
-Tab completion is included for bash and zsh — worktree names autocomplete for `wtcd`, `wtrm`, `wtopen`, and `wtpath`.
-
 ### Copying `.env` files
 
 Worktrees are separate directories — your `.env` files (gitignored) won't be there.
@@ -115,34 +86,11 @@ git wt new --copy-env my-feature
 
 This way your dev server starts immediately without missing config.
 
-### AI session preservation
-
-AI tools like Claude Code store sessions and settings per project path. When a worktree is deleted, that data is normally lost. Use `--copy-ai` to preserve it:
-
-```bash
-# On create: copies .claude/settings.local.json into worktree
-git wt new --copy-ai my-feature
-
-# Work in the worktree — AI tools create sessions, you approve new commands...
-
-# On rm: archives Claude sessions, syncs settings back to origin
-git wt rm my-feature
-#   Archived Claude sessions → .ai-sessions/my-feature/claude/
-#   Synced .claude/settings.local.json → origin
-```
-
-**What happens:**
-- **On create**: copies `.claude/settings.local.json` (approved commands) into the worktree
-- **On remove**: archives Claude Code sessions to `~/.git-wt/<repo>/.ai-sessions/<name>/`, syncs settings back to origin
-- **Extensible**: add new providers via `GIT_WT_AI_PROVIDERS` (define `_ai_copy_<name>` + `_ai_save_<name>` functions in the script)
-
 To enable this permanently:
 
 ```bash
-export GIT_WT_COPY_AI=true  # add to ~/.zshrc or ~/.bashrc
+export GIT_WT_COPY_ENV=true  # add to ~/.zshrc or ~/.bashrc
 ```
-
-The provider system is extensible — see `GIT_WT_AI_PROVIDERS` to control which AI tools are managed.
 
 ### External worktrees
 
@@ -204,28 +152,10 @@ Global flags:
 |----------|---------|-------------|
 | `GIT_WT_HOME` | `~/.git-wt` | Root directory for all worktrees |
 | `GIT_WT_PREFIX` | `wt` | Branch name prefix |
+| `GIT_WT_BASE` | _(current branch)_ | Default base branch for new worktrees |
+| `GIT_WT_COPY_ENV` | `false` | Always copy `.env*` files on new |
 | `GIT_WT_COPY_AI` | `false` | Always copy AI configs on new, save sessions on rm |
 | `GIT_WT_AI_PROVIDERS` | `claude` | Space-separated list of AI providers to manage |
-
-## Shell Completions
-
-The installer sets up completions automatically. For manual setup:
-
-**Bash:**
-
-```bash
-# Add to ~/.bashrc
-source /path/to/git-wt/completions/git-wt.bash
-```
-
-**Zsh:**
-
-```bash
-# Add to ~/.zshrc (before compinit)
-fpath=(~/.local/share/zsh/site-functions $fpath)
-```
-
-Completions support subcommands, flags, worktree names, and branch names.
 
 ## How It Works
 
@@ -273,6 +203,33 @@ git wt origin   # → /Users/you/projects/myapp
 
 This works from the main repo too (prints its own path). Useful for scripts that need to reference the original repository.
 
+### Session preservation
+
+AI tools like Claude Code store sessions and settings per project path. When a worktree is deleted, that data is normally lost. Use `--copy-ai` to preserve it:
+
+```bash
+# On create: copies .claude/settings.local.json into worktree
+git wt new --copy-ai my-feature
+
+# Work in the worktree — AI tools create sessions, you approve new commands...
+
+# On rm: archives Claude sessions, syncs settings back to origin
+git wt rm my-feature
+#   Archived Claude sessions → .ai-sessions/my-feature/claude/
+#   Synced .claude/settings.local.json → origin
+```
+
+**What happens:**
+- **On create**: copies `.claude/settings.local.json` (approved commands) into the worktree
+- **On remove**: archives Claude Code sessions to `~/.git-wt/<repo>/.ai-sessions/<name>/`, syncs settings back to origin
+- **Extensible**: add new providers via `GIT_WT_AI_PROVIDERS` (define `_ai_copy_<name>` + `_ai_save_<name>` functions in the script)
+
+To enable this permanently:
+
+```bash
+export GIT_WT_COPY_AI=true  # add to ~/.zshrc or ~/.bashrc
+```
+
 ### Agent Skill
 
 git-wt ships with a [SKILL.md](skills/git-wt/SKILL.md) that teaches AI agents (Claude Code, Cursor, Windsurf, etc.) how and when to use `git wt` commands.
@@ -310,6 +267,55 @@ cp skill/SKILL.md .cursor/skills/git-wt/SKILL.md
 | AI session preservation | ✅ `--copy-ai` | ❌ | ❌ | ❌ | ❌ |
 | Multi-agent workflows | ✅ | ❌ | ✅ | ✅ Claude-only | ❌ |
 | Install time | ~5 seconds | ~30 seconds | ~10 seconds | ~15 seconds | Built-in |
+
+## Shell Aliases
+
+Install the optional aliases for shorter commands:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/kuderr/git-wt/main/aliases/install.sh | bash
+```
+
+Or source manually:
+
+```bash
+# Add to ~/.bashrc or ~/.zshrc
+source /path/to/git-wt/aliases/git-wt.sh
+```
+
+| Alias | Equivalent | Description |
+|-------|-----------|-------------|
+| `wtcd <name>` | `cd $(git wt path <name>)` | cd into a worktree |
+| `wto` | `cd $(git wt origin)` | cd into the origin (main) repo |
+| `wtn [name]` | `git wt new` + `cd` | Create worktree and cd into it |
+| `wtls` | `git wt list` | List worktrees |
+| `wtla` | `git wt list-all` | List all worktrees |
+| `wtrm <name>` | `git wt rm` | Remove a worktree |
+| `wtopen <name>` | `git wt open` | Open worktree in editor |
+| `wtclean` | `git wt clean` | Remove all worktrees |
+| `wtpath <name>` | `git wt path` | Print worktree path |
+
+Tab completion is included for bash and zsh — worktree names autocomplete for `wtcd`, `wtrm`, `wtopen`, and `wtpath`.
+
+## Shell Completions
+
+The installer sets up completions automatically. For manual setup:
+
+**Bash:**
+
+```bash
+# Add to ~/.bashrc
+source /path/to/git-wt/completions/git-wt.bash
+```
+
+**Zsh:**
+
+```bash
+# Add to ~/.zshrc (before compinit)
+fpath=(~/.local/share/zsh/site-functions $fpath)
+```
+
+Completions support subcommands, flags, worktree names, and branch names.
 
 ## Known Issues
 
