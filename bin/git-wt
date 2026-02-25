@@ -13,9 +13,9 @@ GIT_WT_VERSION="1.3.0"
 # --- Config ---
 GIT_WT_HOME="${GIT_WT_HOME:-${HOME}/.git-wt}"
 WT_PREFIX="${GIT_WT_PREFIX:-wt}"
-WT_BASE=""
+WT_BASE="${GIT_WT_BASE:-}"
 WT_NO_BRANCH=false
-WT_COPY_ENV=false
+WT_COPY_ENV="${GIT_WT_COPY_ENV:-false}"
 WT_COPY_AI="${GIT_WT_COPY_AI:-false}"
 WT_QUIET=false
 
@@ -630,6 +630,8 @@ ${BOLD}Options for new:${RESET}
 ${BOLD}Environment:${RESET}
   GIT_WT_HOME              Worktrees root (default: ~/.git-wt)
   GIT_WT_PREFIX            Default branch prefix (default: wt)
+  GIT_WT_BASE              Default base branch for new worktrees (default: current branch)
+  GIT_WT_COPY_ENV          Always copy .env* files on new (default: false)
   GIT_WT_COPY_AI           Always copy AI configs on new, save on rm (default: false)
   GIT_WT_AI_PROVIDERS      Space-separated AI providers (default: "claude")
 
