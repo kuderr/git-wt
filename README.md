@@ -75,7 +75,13 @@ git wt rm auth-refactor
 
 ### Shell Aliases
 
-Source the optional aliases file for shorter commands:
+Install the optional aliases for shorter commands:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/kuderr/git-wt/main/aliases/install.sh | bash
+```
+
+Or source manually:
 
 ```bash
 # Add to ~/.bashrc or ~/.zshrc
