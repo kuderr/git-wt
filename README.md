@@ -286,6 +286,8 @@ cp skill/SKILL.md .cursor/skills/git-wt/SKILL.md
 
 - **Warp Terminal**: Tab completions for `git wt` don't work. Warp uses its own completion engine and [doesn't delegate to shell completions](https://github.com/warpdotdev/Warp/discussions/434). Completions work correctly in Terminal.app, iTerm2, Ghostty, Kitty, and other terminals that use native zsh/bash completion.
 
+- **Codex session history**: Codex manages its own worktrees at `~/.codex/worktrees/<hash>/` and deletes them after each session. The `/resume` command can't find old sessions because their `cwd` paths no longer exist. This is a Codex-side limitation — `--copy-ai` does not cover Codex since its sessions are not tied to project paths.
+
 ## Uninstall
 
 ```bash
