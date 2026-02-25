@@ -67,18 +67,16 @@ warn() {
 }
 
 get_repo_root() {
-  local toplevel
-  toplevel=$(git rev-parse --show-toplevel 2>/dev/null) && echo "$toplevel" && return
+  local common_dir
+  common_dir=$(git rev-parse --git-common-dir 2>/dev/null) || die "not inside a git repository"
 
-  # might be inside a worktree — resolve via git common dir
-  local common
-  common=$(git rev-parse --git-common-dir 2>/dev/null)
-  if [[ -n "$common" && "$common" != ".git" ]]; then
-    (cd "$common" && cd .. && pwd)
-    return
+  if [[ "$common_dir" == ".git" ]]; then
+    # Main worktree — toplevel is the real repo root
+    git rev-parse --show-toplevel
+  else
+    # Linked worktree — resolve through .git common dir to main repo root
+    (cd "$common_dir" && cd .. && pwd)
   fi
-
-  die "not inside a git repository"
 }
 
 get_repo_name() {
