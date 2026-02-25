@@ -6,17 +6,17 @@
 # cd into a worktree by name
 #   wtcd my-feature
 wtcd() {
-  local path
-  path=$(git wt path "$1" 2>/dev/null) || { echo "error: worktree '$1' not found" >&2; return 1; }
-  cd "$path" || return 1
+  local wt_path
+  wt_path=$(git wt path "$1" 2>/dev/null) || { echo "error: worktree '$1' not found" >&2; return 1; }
+  cd "$wt_path" || return 1
 }
 
 # cd into the origin (main) repo from any worktree
 #   wto
 wto() {
-  local path
-  path=$(git wt origin 2>/dev/null) || { echo "error: not in a git repo" >&2; return 1; }
-  cd "$path" || return 1
+  local wt_path
+  wt_path=$(git wt origin 2>/dev/null) || { echo "error: not in a git repo" >&2; return 1; }
+  cd "$wt_path" || return 1
 }
 
 # Create a new worktree and cd into it
@@ -24,16 +24,16 @@ wto() {
 #   wtn                  (auto-generated name)
 #   wtn -b main hotfix
 wtn() {
-  local output line path
+  local output line wt_path
   output=$(git wt new "$@") || return 1
   echo "$output"
   while IFS= read -r line; do
     if [[ "$line" == *"Path:"* ]]; then
-      read -r path <<< "${line##*Path:}"
+      read -r wt_path <<< "${line##*Path:}"
       break
     fi
   done <<< "$output"
-  [[ -n "${path:-}" ]] && cd "$path" || return 1
+  [[ -n "${wt_path:-}" ]] && cd "$wt_path" || return 1
 }
 
 # List worktrees (current repo)
