@@ -106,6 +106,18 @@ Use `git wt adopt` when:
 - A worktree was created with `git worktree add` and you want git-wt to manage it
 - You want the worktree moved to `~/.git-wt/` for consistent management
 
+## Shell Aliases
+
+Optional `aliases/git-wt.sh` provides shorter commands. Source it in `.bashrc`/`.zshrc`:
+
+| Alias | What it does |
+|-------|-------------|
+| `wtcd <name>` | `cd` into a worktree |
+| `wto` | `cd` to the origin (main) repo |
+| `wtn [name]` | Create worktree + `cd` into it |
+| `wtls` / `wtla` | List / list-all |
+| `wtrm` / `wtopen` / `wtclean` / `wtpath` | Shorthand for corresponding commands |
+
 ## Workflow: Parallel Agent Isolation
 
 ```bash

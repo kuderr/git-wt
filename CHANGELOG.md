@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.4.0] - 2026-02-25
+
+### Added
+- Shell aliases (`aliases/git-wt.sh`) — `wtcd`, `wto`, `wtn`, `wtls`, `wtla`, `wtrm`, `wtopen`, `wtclean`, `wtpath`
+- `wtn` creates a worktree and `cd`s into it in one step
+- `wtcd <name>` jumps into a worktree, `wto` jumps to the origin repo
+- Tab completion for aliases (bash + zsh)
+
 ## [1.3.0] - 2026-02-25
 
 ### Added

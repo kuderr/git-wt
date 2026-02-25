@@ -73,6 +73,35 @@ git wt open auth-refactor
 git wt rm auth-refactor
 ```
 
+### Shell Aliases
+
+Install the optional aliases for shorter commands:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/kuderr/git-wt/main/aliases/install.sh | bash
+```
+
+Or source manually:
+
+```bash
+# Add to ~/.bashrc or ~/.zshrc
+source /path/to/git-wt/aliases/git-wt.sh
+```
+
+| Alias | Equivalent | Description |
+|-------|-----------|-------------|
+| `wtcd <name>` | `cd $(git wt path <name>)` | cd into a worktree |
+| `wto` | `cd $(git wt origin)` | cd into the origin (main) repo |
+| `wtn [name]` | `git wt new` + `cd` | Create worktree and cd into it |
+| `wtls` | `git wt list` | List worktrees |
+| `wtla` | `git wt list-all` | List all worktrees |
+| `wtrm <name>` | `git wt rm` | Remove a worktree |
+| `wtopen <name>` | `git wt open` | Open worktree in editor |
+| `wtclean` | `git wt clean` | Remove all worktrees |
+| `wtpath <name>` | `git wt path` | Print worktree path |
+
+Tab completion is included for bash and zsh — worktree names autocomplete for `wtcd`, `wtrm`, `wtopen`, and `wtpath`.
+
 ### Copying `.env` files
 
 Worktrees are separate directories — your `.env` files (gitignored) won't be there.
