@@ -9,6 +9,7 @@ Wraps `git worktree` into an ergonomic CLI: `git wt <command>`.
 
 ```
 bin/git-wt              — main executable (bash script)
+aliases/git-wt.sh       — optional shell aliases (wtcd, wto, wtn, etc.)
 completions/
   git-wt.bash           — bash completions
   _git-wt               — zsh completions
