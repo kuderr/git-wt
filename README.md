@@ -86,6 +86,35 @@ git wt new --copy-env my-feature
 
 This way your dev server starts immediately without missing config.
 
+### AI session preservation
+
+AI tools like Claude Code store sessions and settings per project path. When a worktree is deleted, that data is normally lost. Use `--copy-ai` to preserve it:
+
+```bash
+# On create: copies .claude/settings.local.json into worktree
+git wt new --copy-ai my-feature
+
+# Work in the worktree — AI tools create sessions, you approve new commands...
+
+# On rm: archives Claude sessions, syncs settings back to origin
+git wt rm my-feature
+#   Archived Claude sessions → .ai-sessions/my-feature/claude/
+#   Synced .claude/settings.local.json → origin
+```
+
+**What happens:**
+- **On create**: copies `.claude/settings.local.json` (approved commands) into the worktree
+- **On remove**: archives Claude Code sessions to `~/.git-wt/<repo>/.ai-sessions/<name>/`, syncs settings back to origin
+- **Extensible**: add new providers via `GIT_WT_AI_PROVIDERS` (define `_ai_copy_<name>` + `_ai_save_<name>` functions in the script)
+
+To enable this permanently:
+
+```bash
+export GIT_WT_COPY_AI=true  # add to ~/.zshrc or ~/.bashrc
+```
+
+The provider system is extensible — see `GIT_WT_AI_PROVIDERS` to control which AI tools are managed.
+
 ### External worktrees
 
 git-wt can see and manage worktrees created outside of `git wt` (e.g., via `git worktree add`).
@@ -132,6 +161,7 @@ Options for `git wt new`:
 | `-p, --prefix <prefix>` | Branch prefix (default: `wt`) |
 | `--no-branch` | Create with detached HEAD instead of a new branch |
 | `--copy-env` | Copy `.env*` files from the repo root into the worktree |
+| `--copy-ai` | Copy AI agent configs and save sessions on rm |
 
 Global flags:
 
@@ -145,6 +175,8 @@ Global flags:
 |----------|---------|-------------|
 | `GIT_WT_HOME` | `~/.git-wt` | Root directory for all worktrees |
 | `GIT_WT_PREFIX` | `wt` | Branch name prefix |
+| `GIT_WT_COPY_AI` | `false` | Always copy AI configs on new, save sessions on rm |
+| `GIT_WT_AI_PROVIDERS` | `claude` | Space-separated list of AI providers to manage |
 
 ## Shell Completions
 
@@ -246,12 +278,15 @@ cp skill/SKILL.md .cursor/skills/git-wt/SKILL.md
 | Shell completions | ✅ bash + zsh | ✅ | ❌ | ❌ | ✅ |
 | Editor integration | ✅ Cursor/VS Code | ❌ | ✅ | ❌ | ❌ |
 | Agent skill (SKILL.md) | ✅ `npx skills add` | ❌ | ❌ | ❌ | ❌ |
+| AI session preservation | ✅ `--copy-ai` | ❌ | ❌ | ❌ | ❌ |
 | Multi-agent workflows | ✅ | ❌ | ✅ | ✅ Claude-only | ❌ |
 | Install time | ~5 seconds | ~30 seconds | ~10 seconds | ~15 seconds | Built-in |
 
 ## Known Issues
 
 - **Warp Terminal**: Tab completions for `git wt` don't work. Warp uses its own completion engine and [doesn't delegate to shell completions](https://github.com/warpdotdev/Warp/discussions/434). Completions work correctly in Terminal.app, iTerm2, Ghostty, Kitty, and other terminals that use native zsh/bash completion.
+
+- **Codex session history**: Codex manages its own worktrees at `~/.codex/worktrees/<hash>/` and deletes them after each session. The `/resume` command can't find old sessions because their `cwd` paths no longer exist. This is a Codex-side limitation — `--copy-ai` does not cover Codex since its sessions are not tied to project paths.
 
 ## Uninstall
 

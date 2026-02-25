@@ -26,6 +26,7 @@ git wt new                           # Auto-named (e.g., swift-jade)
 git wt new my-feature                # Named
 git wt new -b main hotfix            # Fork from specific branch
 git wt new --copy-env experiment     # Copy .env* files into worktree
+git wt new --copy-ai my-feature      # Copy AI configs, save sessions on rm
 git wt new --no-branch scratch       # Detached HEAD (no branch created)
 ```
 
@@ -74,12 +75,15 @@ git wt clean                         # Remove all managed worktrees for current 
 - **`adopt`**: moves an external worktree under `~/.git-wt/` so git-wt fully manages it
 - **External worktrees**: `list`, `path`, `open` work with worktrees created outside git-wt
 - **`--copy-env`**: copies all `.env*` files from repo root (critical for dev servers)
+- **`--copy-ai`**: copies AI configs on create, archives sessions + syncs settings on rm
 - **`origin`**: prints main repo path — works from any worktree or main repo itself
 
 ## Environment Variables
 
 - `GIT_WT_HOME` — Root directory for all worktrees (default: `~/.git-wt`)
 - `GIT_WT_PREFIX` — Branch name prefix (default: `wt`)
+- `GIT_WT_COPY_AI` — Always copy AI configs on new, save sessions on rm (default: `false`)
+- `GIT_WT_AI_PROVIDERS` — Space-separated AI providers to manage (default: `claude`)
 
 ## When to Use
 
@@ -93,6 +97,11 @@ Use `git wt new --copy-env` when:
 - The project has `.env` files needed for the dev server to start
 - The worktree needs the same configuration as the main repo
 
+Use `git wt new --copy-ai` when:
+- Working with Claude Code or other AI tools in worktrees
+- You want approved commands (`.claude/settings.local.json`) available immediately
+- You want Claude sessions archived (not lost) when the worktree is removed
+
 Use `git wt adopt` when:
 - A worktree was created with `git worktree add` and you want git-wt to manage it
 - You want the worktree moved to `~/.git-wt/` for consistent management
@@ -100,16 +109,16 @@ Use `git wt adopt` when:
 ## Workflow: Parallel Agent Isolation
 
 ```bash
-# Agent 1: create isolated worktree
-git wt new --copy-env task-auth
+# Agent 1: create isolated worktree with AI config
+git wt new --copy-env --copy-ai task-auth
 
 # Agent 2: create another
-git wt new --copy-env task-api
+git wt new --copy-env --copy-ai task-api
 
 # Each agent works independently in their worktree
 cd $(git wt path task-auth)
 
-# When done
+# When done — sessions archived, settings synced back
 git wt rm task-auth
 git wt rm task-api
 ```

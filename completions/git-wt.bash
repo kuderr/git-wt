@@ -55,7 +55,7 @@ _git_wt() {
           ;;
         *)
           if [[ "$cur" == -* ]]; then
-            COMPREPLY=($(compgen -W "-b --base -p --prefix --no-branch --copy-env" -- "$cur"))
+            COMPREPLY=($(compgen -W "-b --base -p --prefix --no-branch --copy-env --copy-ai" -- "$cur"))
           fi
           ;;
       esac
