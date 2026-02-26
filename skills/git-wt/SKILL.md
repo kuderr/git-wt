@@ -16,7 +16,7 @@ Worktrees live outside the repo — no `.gitignore` changes needed.
 
 `git-wt` must be installed and in PATH. Verify with `git wt --version`.
 
-If not installed, ask the user to install it from: https://github.com/kuderr/git-wt#install
+If not installed, ask the user to install it themselves.
 
 ## Commands Reference
 
@@ -84,8 +84,8 @@ git wt clean                         # Remove all managed worktrees for current 
 - **`adopt`**: moves an external worktree under `~/.git-wt/` so git-wt fully manages it
 - **External worktrees**: `list`, `path`, `open` work with worktrees created outside git-wt
 - **`checkout`**: checks out an existing branch (local or remote) into a managed worktree — does NOT create new branches
-- **`--copy-env`**: copies all `.env*` files from repo root (critical for dev servers)
-- **`--copy-ai`**: copies AI configs on create, archives sessions + syncs settings on rm
+- **`--copy-env`**: copies `.env*` files from repo root into the new worktree directory (local filesystem only)
+- **`--copy-ai`**: copies AI config files into worktree on create; archives session files back on rm (local filesystem only)
 - **`origin`**: prints main repo path — works from any worktree or main repo itself
 
 ## Environment Variables
@@ -133,6 +133,14 @@ Optional `aliases/git-wt.sh` provides shorter commands. Source it in `.bashrc`/`
 | `wtco <branch>` | Checkout existing branch + `cd` into it |
 | `wtls` / `wtla` | List / list-all |
 | `wtrm` / `wtopen` / `wtclean` / `wtpath` | Shorthand for corresponding commands |
+
+## Security
+
+- All operations are **local filesystem only** — git-wt never makes network requests or sends data externally
+- `--copy-env` copies `.env*` files between local directories on the same machine (repo root → worktree)
+- `--copy-ai` copies AI config/session files between local directories on the same machine
+- No credentials, tokens, or secrets leave the local filesystem
+- Worktrees are stored under `~/.git-wt/` with standard filesystem permissions
 
 ## Workflow: Parallel Agent Isolation
 
