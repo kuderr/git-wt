@@ -53,6 +53,37 @@ wtco() {
   [[ -n "${wt_path:-}" ]] && cd "$wt_path" || return 1
 }
 
+# Remove current worktree and cd back to origin
+#   wtbye
+wtbye() {
+  local origin
+  origin=$(git wt origin 2>/dev/null) || { echo "error: not in a git repo" >&2; return 1; }
+
+  local cwd
+  cwd=$(pwd -P)
+
+  if [[ "$cwd" == "$origin" || "$cwd" == "$origin/"* ]]; then
+    echo "error: already in origin repo, not in a worktree" >&2
+    return 1
+  fi
+
+  local wt_home="${GIT_WT_HOME:-${HOME}/.git-wt}"
+  local repo_name
+  repo_name=$(basename "$origin")
+  local wt_root="${wt_home}/${repo_name}"
+
+  if [[ "$cwd" != "${wt_root}/"* ]]; then
+    echo "error: not in a git-wt managed worktree" >&2
+    return 1
+  fi
+
+  local wt_name="${cwd#"${wt_root}/"}"
+  wt_name="${wt_name%%/*}"
+
+  cd "$origin" || return 1
+  git wt rm "$wt_name"
+}
+
 # List worktrees (current repo)
 alias wtls='git wt list'
 
