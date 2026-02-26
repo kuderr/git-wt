@@ -318,6 +318,7 @@ source /path/to/git-wt/aliases/git-wt.sh
 | `wto` | `cd $(git wt origin)` | cd into the origin (main) repo |
 | `wtn [name]` | `git wt new` + `cd` | Create worktree and cd into it |
 | `wtco <branch>` | `git wt checkout` + `cd` | Checkout existing branch and cd into it |
+| `wtbye` | `git wt rm` + `cd origin` | Remove current worktree and cd to origin |
 | `wtls` | `git wt list` | List worktrees |
 | `wtla` | `git wt list-all` | List all worktrees |
 | `wtrm <name>` | `git wt rm` | Remove a worktree |
