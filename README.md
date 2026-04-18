@@ -250,9 +250,10 @@ git wt rm my-feature
 ```
 
 **What happens:**
-- **On create**: copies `.claude/settings.local.json` (approved commands) into the worktree
-- **On remove (Claude)**: moves Claude Code session files from the worktree's Claude project dir into the origin repo's Claude project dir (`~/.claude/projects/<origin-encoded>/`) and rewrites `cwd` inside each JSONL so sessions show up in `/resume` when you're back in the main repo. Also syncs settings back to origin.
-- **On remove (Codex)**: scans `~/.codex/archived_sessions/` for rollouts whose `session_meta.cwd` matches the worktree path and rewrites every `cwd` field in those sessions to the origin path. `codex resume` can then surface them from the main repo.
+- **On create (Claude)**: copies `.claude/settings.local.json` into the worktree; **seeds** origin's Claude project dir into the worktree's project dir with `cwd` rewritten to the worktree path — `/resume` inside the worktree sees the same history (origin keeps its copy untouched).
+- **On create (Codex)**: for every rollout in `~/.codex/archived_sessions/` whose `session_meta.cwd` matches origin, duplicates the file with a fresh UUID and `cwd` set to the worktree path, mirrors the `session_index.jsonl` entry, and records the new UUID in `$wt_path/.git-wt-codex-copies` so removal can clean up later. `codex resume` in the worktree sees the same history (origin's originals stay intact).
+- **On remove (Claude)**: moves Claude Code session files from the worktree's Claude project dir into the origin repo's Claude project dir (`~/.claude/projects/<origin-encoded>/`), rewrites `cwd` inside each JSONL, and if a session was seeded and continued in the worktree, the worktree's newer version replaces origin's. Also syncs settings back to origin.
+- **On remove (Codex)**: discards the seeded rollouts listed in `.git-wt-codex-copies` (they were disposable duplicates), then scans `~/.codex/archived_sessions/` for any remaining rollouts whose `cwd` matches the worktree path (genuine work done in the worktree) and rebinds `cwd` to origin so `codex resume` in the main repo surfaces them.
 - **Extensible**: controlled by `GIT_WT_AI_PROVIDERS` (default `"claude codex"`). Add new providers by defining `_ai_copy_<name>` + `_ai_save_<name>` functions in the script.
 
 To opt out (single run or permanently):

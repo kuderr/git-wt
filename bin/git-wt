@@ -8,7 +8,7 @@
 # shellcheck disable=SC2059  # intentional: ANSI color codes in printf format strings
 set -euo pipefail
 
-GIT_WT_VERSION="1.7.0"
+GIT_WT_VERSION="1.8.0"
 
 # --- Config ---
 GIT_WT_HOME="${GIT_WT_HOME:-${HOME}/.git-wt}"
@@ -273,11 +273,47 @@ _ai_save_all() {
 
 _ai_copy_claude() {
   local origin="$1" wt_path="$2"
+
+  # 1. Repo-level settings (approved commands) — same as before
   local src="${origin}/.claude/settings.local.json"
   if [[ -f "$src" ]]; then
     mkdir -p "${wt_path}/.claude"
     cp "$src" "${wt_path}/.claude/"
     info "  Copied .claude/settings.local.json"
+  fi
+
+  # 2. Session history — copy origin's Claude project dir into the worktree's
+  # project dir and rewrite `cwd` so /resume in the new worktree sees the
+  # same conversation history. Origin is left intact (copy, not move).
+  local origin_project_id wt_project_id
+  origin_project_id=$(_claude_project_id "$origin")
+  wt_project_id=$(_claude_project_id "$wt_path")
+  local origin_claude="${HOME}/.claude/projects/${origin_project_id}"
+  local wt_claude="${HOME}/.claude/projects/${wt_project_id}"
+
+  if [[ -d "$origin_claude" ]]; then
+    mkdir -p "$wt_claude"
+    local copied=0 entry base
+    shopt -s nullglob dotglob
+    for entry in "$origin_claude"/*; do
+      base=$(basename "$entry")
+      if [[ -e "${wt_claude}/${base}" ]]; then
+        continue
+      fi
+      cp -R "$entry" "${wt_claude}/"
+      copied=$((copied + 1))
+    done
+    shopt -u nullglob dotglob
+
+    # Rewrite cwd in every copied jsonl
+    local f
+    while IFS= read -r -d '' f; do
+      _rewrite_cwd_jsonl "$f" "$origin" "$wt_path"
+    done < <(find "$wt_claude" -name '*.jsonl' -type f -print0)
+
+    if [[ $copied -gt 0 ]]; then
+      info "  Seeded ${copied} Claude session entry(s) from origin (/resume in worktree)"
+    fi
   fi
 }
 
@@ -321,14 +357,14 @@ _ai_save_claude() {
     done < <(find "$wt_claude" -name '*.jsonl' -type f -print0)
 
     # Move all entries (files + session-uuid folders) into origin project dir.
-    # Skip collisions (session UUIDs don't collide in practice, but be safe).
+    # On collision (e.g. seeded-on-create sessions that continued in the wt)
+    # the wt version is treated as the newer continuation and replaces origin.
     local entry base
     shopt -s nullglob dotglob
     for entry in "$wt_claude"/*; do
       base=$(basename "$entry")
       if [[ -e "${origin_claude}/${base}" ]]; then
-        warn "Skipping existing '${base}' in origin Claude project"
-        continue
+        rm -rf "${origin_claude:?}/${base}"
       fi
       mv "$entry" "${origin_claude}/"
       moved=$((moved + 1))
@@ -361,10 +397,70 @@ _ai_save_claude() {
 # worktree, its sessions get orphaned because that cwd no longer exists.
 # Rebinding cwd → origin makes those sessions resumable from the main repo.
 
+# Seed the new worktree with duplicates of origin's Codex sessions so
+# `codex resume` inside the worktree can pick up the same history.
+# Implementation: for each rollout whose session_meta.cwd == origin, write
+# a new rollout with a fresh UUID and cwd == wt_path, mirror the index
+# entry, and record the new UUID in $wt_path/.git-wt-codex-copies so that
+# `rm` can discard these copies later (originals still live at origin).
 _ai_copy_codex() {
-  # No per-project config to copy for Codex — all config lives globally at
-  # ~/.codex/config.toml. Kept as a no-op for signature symmetry.
-  :
+  local origin="$1" wt_path="$2"
+
+  local codex_sessions="${HOME}/.codex/archived_sessions"
+  local codex_index="${HOME}/.codex/session_index.jsonl"
+  local marker="${wt_path}/.git-wt-codex-copies"
+  [[ -d "$codex_sessions" ]] || return 0
+
+  if ! command -v uuidgen >/dev/null 2>&1; then
+    warn "uuidgen not found — skipping Codex session copy"
+    return 0
+  fi
+
+  local match_pat="\"cwd\":\"${origin}\""
+  local copied=0 f first_line old_uuid new_uuid new_name orig_idx
+  shopt -s nullglob
+  for f in "$codex_sessions"/rollout-*.jsonl; do
+    if ! head -n1 "$f" 2>/dev/null | grep -qF "$match_pat"; then
+      continue
+    fi
+
+    # payload.id is the first `"id":"<uuid>"` on the session_meta line
+    first_line=$(head -n1 "$f")
+    old_uuid=$(printf '%s' "$first_line" | sed -n 's/.*"id":"\([0-9a-f-]\{36\}\)".*/\1/p')
+    [[ -z "$old_uuid" ]] && continue
+
+    new_uuid=$(uuidgen | tr '[:upper:]' '[:lower:]')
+    new_name="${f%-"${old_uuid}".jsonl}-${new_uuid}.jsonl"
+
+    cp "$f" "$new_name"
+    _rewrite_cwd_jsonl "$new_name" "$origin" "$wt_path"
+    # Rewrite every reference to the old UUID — payload.id, plus any message
+    # that quoted the session id — so the copy is internally self-consistent.
+    if sed --version >/dev/null 2>&1; then
+      sed -i "s|${old_uuid}|${new_uuid}|g" "$new_name"
+    else
+      sed -i '' "s|${old_uuid}|${new_uuid}|g" "$new_name"
+    fi
+
+    # Mirror the session_index entry (thread_name + updated_at) if present
+    if [[ -f "$codex_index" ]]; then
+      orig_idx=$(grep -F "\"id\":\"${old_uuid}\"" "$codex_index" | head -n1 || true)
+      if [[ -n "$orig_idx" ]]; then
+        printf '%s\n' "${orig_idx//$old_uuid/$new_uuid}" >> "$codex_index"
+      fi
+    fi
+
+    printf '%s\n' "$new_uuid" >> "$marker"
+    copied=$((copied + 1))
+  done
+  shopt -u nullglob
+
+  if [[ $copied -gt 0 ]]; then
+    info "  Seeded ${copied} Codex session(s) from origin (codex resume in worktree)"
+  else
+    # No copies happened — don't leave an empty marker around
+    [[ -f "$marker" && ! -s "$marker" ]] && rm -f "$marker"
+  fi
 }
 
 _ai_save_codex() {
@@ -372,14 +468,36 @@ _ai_save_codex() {
   local wt_path="$1" wt_name="$2" archive_dir="$3" origin="$4"
 
   local codex_sessions="${HOME}/.codex/archived_sessions"
+  local codex_index="${HOME}/.codex/session_index.jsonl"
+  local marker="${wt_path}/.git-wt-codex-copies"
   [[ -d "$codex_sessions" ]] || return 0
 
-  # Literal substring — cwd values in JSON are quoted paths, no regex escaping needed with grep -F
+  # 1. Delete rollouts that were seeded on create — they're disposable
+  #    duplicates of origin sessions. Originals still live in origin.
+  local deleted=0 uuid target tmp
+  if [[ -f "$marker" ]]; then
+    while IFS= read -r uuid; do
+      [[ -z "$uuid" ]] && continue
+      shopt -s nullglob
+      for target in "$codex_sessions"/rollout-*-"${uuid}".jsonl; do
+        rm -f "$target"
+        deleted=$((deleted + 1))
+      done
+      shopt -u nullglob
+      if [[ -f "$codex_index" ]]; then
+        tmp=$(mktemp)
+        grep -vF "\"id\":\"${uuid}\"" "$codex_index" > "$tmp" || true
+        mv "$tmp" "$codex_index"
+      fi
+    done < "$marker"
+  fi
+
+  # 2. Rebind any remaining wt-cwd rollouts — these are genuine sessions
+  #    created inside the worktree that should live on in origin.
   local match_pat="\"cwd\":\"${wt_path}\""
   local updated=0 f
   shopt -s nullglob
   for f in "$codex_sessions"/rollout-*.jsonl; do
-    # Only scan the first line (session_meta) to decide ownership — cheap and accurate
     if head -n1 "$f" 2>/dev/null | grep -qF "$match_pat"; then
       _rewrite_cwd_jsonl "$f" "$wt_path" "$origin"
       updated=$((updated + 1))
@@ -387,6 +505,9 @@ _ai_save_codex() {
   done
   shopt -u nullglob
 
+  if [[ $deleted -gt 0 ]]; then
+    info "  Discarded ${deleted} seeded Codex copy(s)"
+  fi
   if [[ $updated -gt 0 ]]; then
     info "  Rebound ${updated} Codex session(s) → origin (codex resume will see them)"
   fi

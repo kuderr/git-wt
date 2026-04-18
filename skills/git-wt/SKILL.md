@@ -85,7 +85,7 @@ git wt clean                         # Remove all managed worktrees for current 
 - **External worktrees**: `list`, `path`, `open` work with worktrees created outside git-wt
 - **`checkout`**: checks out an existing branch (local or remote) into a managed worktree — does NOT create new branches
 - **`.env*` copy**: enabled by default — copies `.env*` files from repo root into the new worktree directory (local filesystem only). Disable with `--no-copy-env` per run or `GIT_WT_COPY_ENV=false`.
-- **AI session preservation**: enabled by default — copies AI config files into worktree on create; on rm, merges Claude sessions into the origin repo's Claude project (so `/resume` in the main repo sees them), rebinds Codex sessions by rewriting `cwd` in `~/.codex/archived_sessions/` rollouts that belong to the worktree (so `codex resume` finds them), and syncs settings back (local filesystem only). Disable with `--no-copy-ai` per run or `GIT_WT_COPY_AI=false`.
+- **AI session preservation**: enabled by default. On create: copies AI config files and seeds origin's Claude + Codex sessions into the worktree (history visible in `/resume` and `codex resume` there). On rm: merges wt's Claude sessions back to origin (wt continuations win), discards seeded Codex copies, rebinds genuine wt-created Codex sessions to origin, syncs settings back. Local filesystem only. Disable with `--no-copy-ai` per run or `GIT_WT_COPY_AI=false`.
 - **`origin`**: prints main repo path — works from any worktree or main repo itself
 
 ## Environment Variables
@@ -107,8 +107,8 @@ Use `git wt new` when:
 Defaults you get for free (no flags):
 - `.env*` files from the repo root are copied into the worktree — dev servers that need env vars start immediately
 - `.claude/settings.local.json` (approved Claude commands) is copied into the worktree on create
-- On `rm`, Claude session files are merged into the origin repo's Claude project and `cwd` inside each JSONL is rewritten — sessions show up in `/resume` from the main repo
-- On `rm`, Codex rollouts in `~/.codex/archived_sessions/` whose `session_meta.cwd` pointed at the worktree get their `cwd` rebound to the origin path — `codex resume` in the main repo surfaces them
+- On `new`, origin's Claude sessions are seeded into the worktree (cwd rewritten) and origin's Codex rollouts are duplicated with fresh UUIDs/cwd — `/resume` and `codex resume` in the worktree pick up the same history
+- On `rm`, Claude session files are merged back to origin (newer wt continuations replace origin's version), the seeded Codex copies are discarded, and genuine worktree Codex sessions get their `cwd` rebound to origin
 
 Use `--no-copy-env` / `--no-copy-ai` (or set `GIT_WT_COPY_ENV=false` / `GIT_WT_COPY_AI=false`) when:
 - You want a fully clean worktree without env or AI config

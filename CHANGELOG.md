@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.8.0] - 2026-04-18
+
+### Added
+- **Seeding AI session history into new worktrees on `git wt new`.** Claude sessions from origin's project dir are copied into the worktree's project dir with `cwd` rewritten to the worktree path. Codex rollouts whose `session_meta.cwd` matches origin are duplicated with fresh UUIDs (filename + `payload.id`), `cwd` rewritten to the worktree path, and mirrored in `~/.codex/session_index.jsonl`. Origin stays intact in both cases. The seeded Codex UUIDs are recorded in `$wt_path/.git-wt-codex-copies` so `rm` can discard them cleanly.
+
+### Changed
+- **Claude rm collision handling**: previously we warned and skipped when the same session file existed in both worktree and origin (e.g. a session seeded on create that was continued in the worktree). Now the worktree's version replaces origin's — it's the continuation.
+- **Codex rm** now discards seeded copies (UUIDs listed in `.git-wt-codex-copies`) before rebinding any remaining wt-cwd rollouts. Genuine sessions created in the worktree still get rebound to origin; disposable duplicates are removed along with their `session_index.jsonl` entries.
+
 ## [1.7.0] - 2026-04-18
 
 ### Added
