@@ -8,7 +8,7 @@
 # shellcheck disable=SC2059  # intentional: ANSI color codes in printf format strings
 set -euo pipefail
 
-GIT_WT_VERSION="1.6.0"
+GIT_WT_VERSION="1.7.0"
 
 # --- Config ---
 GIT_WT_HOME="${GIT_WT_HOME:-${HOME}/.git-wt}"
@@ -250,7 +250,7 @@ _claude_project_id() { echo "${1//[^a-zA-Z0-9]/-}"; }
 _ai_copy_all() {
   local origin="$1" wt_path="$2"
   local provider
-  for provider in ${GIT_WT_AI_PROVIDERS:-claude}; do
+  for provider in ${GIT_WT_AI_PROVIDERS:-claude codex}; do
     if declare -f "_ai_copy_${provider}" >/dev/null 2>&1; then
       "_ai_copy_${provider}" "$origin" "$wt_path"
     fi
@@ -262,7 +262,7 @@ _ai_copy_all() {
 _ai_save_all() {
   local wt_path="$1" wt_name="$2" archive_dir="$3" origin="$4"
   local provider
-  for provider in ${GIT_WT_AI_PROVIDERS:-claude}; do
+  for provider in ${GIT_WT_AI_PROVIDERS:-claude codex}; do
     if declare -f "_ai_save_${provider}" >/dev/null 2>&1; then
       "_ai_save_${provider}" "$wt_path" "$wt_name" "$archive_dir" "$origin"
     fi
@@ -351,6 +351,44 @@ _ai_save_claude() {
       cp "$wt_settings" "$origin_settings"
       info "  Synced .claude/settings.local.json → origin"
     fi
+  fi
+}
+
+# --- Provider: Codex CLI ---
+# Codex stores all sessions globally in ~/.codex/archived_sessions/rollout-*.jsonl
+# (not in per-project folders like Claude). `codex resume` filters by the `cwd`
+# recorded inside the session's first `session_meta` line. When we delete a
+# worktree, its sessions get orphaned because that cwd no longer exists.
+# Rebinding cwd → origin makes those sessions resumable from the main repo.
+
+_ai_copy_codex() {
+  # No per-project config to copy for Codex — all config lives globally at
+  # ~/.codex/config.toml. Kept as a no-op for signature symmetry.
+  :
+}
+
+_ai_save_codex() {
+  # shellcheck disable=SC2034  # wt_name/archive_dir kept for provider signature symmetry
+  local wt_path="$1" wt_name="$2" archive_dir="$3" origin="$4"
+
+  local codex_sessions="${HOME}/.codex/archived_sessions"
+  [[ -d "$codex_sessions" ]] || return 0
+
+  # Literal substring — cwd values in JSON are quoted paths, no regex escaping needed with grep -F
+  local match_pat="\"cwd\":\"${wt_path}\""
+  local updated=0 f
+  shopt -s nullglob
+  for f in "$codex_sessions"/rollout-*.jsonl; do
+    # Only scan the first line (session_meta) to decide ownership — cheap and accurate
+    if head -n1 "$f" 2>/dev/null | grep -qF "$match_pat"; then
+      _rewrite_cwd_jsonl "$f" "$wt_path" "$origin"
+      updated=$((updated + 1))
+    fi
+  done
+  shopt -u nullglob
+
+  if [[ $updated -gt 0 ]]; then
+    info "  Rebound ${updated} Codex session(s) → origin (codex resume will see them)"
   fi
 }
 
@@ -848,7 +886,7 @@ ${BOLD}Environment:${RESET}
   GIT_WT_BASE              Default base branch for new worktrees (default: current branch)
   GIT_WT_COPY_ENV          Copy .env* files on new (default: true; set 'false' to opt out)
   GIT_WT_COPY_AI           Copy AI configs on new, save sessions on rm (default: true; set 'false' to opt out)
-  GIT_WT_AI_PROVIDERS      Space-separated AI providers (default: "claude")
+  GIT_WT_AI_PROVIDERS      Space-separated AI providers (default: "claude codex")
 
 ${BOLD}Examples:${RESET}
   git wt new                       ${DIM}# ~/.git-wt/myrepo/swift-jade/${RESET}

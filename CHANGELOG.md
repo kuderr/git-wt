@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.7.0] - 2026-04-18
+
+### Added
+- **Codex session preservation** via new built-in `codex` provider. On `git wt rm`, scans `~/.codex/archived_sessions/rollout-*.jsonl` for rollouts whose `session_meta.cwd` matches the deleted worktree path and rewrites every `cwd` field to the origin path. `codex resume` in the main repo now surfaces those sessions — previously they were orphaned because Codex filters by cwd and the worktree path no longer existed.
+- `GIT_WT_AI_PROVIDERS` default changed from `"claude"` to `"claude codex"` — both providers run out of the box.
+
+### Removed
+- "Codex session history" known-issues entry from the README — the limitation is now addressed.
+
 ## [1.6.0] - 2026-04-18
 
 ### Changed

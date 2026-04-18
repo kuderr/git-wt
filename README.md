@@ -184,7 +184,7 @@ Global flags:
 | `GIT_WT_BASE` | _(current branch)_ | Default base branch for new worktrees |
 | `GIT_WT_COPY_ENV` | `true` | Copy `.env*` files on new (set `false` to opt out) |
 | `GIT_WT_COPY_AI` | `true` | Copy AI configs on new, save sessions on rm (set `false` to opt out) |
-| `GIT_WT_AI_PROVIDERS` | `claude` | Space-separated list of AI providers to manage |
+| `GIT_WT_AI_PROVIDERS` | `claude codex` | Space-separated list of AI providers to manage |
 
 ## How It Works
 
@@ -251,8 +251,9 @@ git wt rm my-feature
 
 **What happens:**
 - **On create**: copies `.claude/settings.local.json` (approved commands) into the worktree
-- **On remove**: moves Claude Code session files from the worktree's Claude project dir into the origin repo's Claude project dir (`~/.claude/projects/<origin-encoded>/`) and rewrites `cwd` inside each JSONL so sessions show up in `/resume` when you're back in the main repo. Also syncs settings back to origin.
-- **Extensible**: add new providers via `GIT_WT_AI_PROVIDERS` (define `_ai_copy_<name>` + `_ai_save_<name>` functions in the script)
+- **On remove (Claude)**: moves Claude Code session files from the worktree's Claude project dir into the origin repo's Claude project dir (`~/.claude/projects/<origin-encoded>/`) and rewrites `cwd` inside each JSONL so sessions show up in `/resume` when you're back in the main repo. Also syncs settings back to origin.
+- **On remove (Codex)**: scans `~/.codex/archived_sessions/` for rollouts whose `session_meta.cwd` matches the worktree path and rewrites every `cwd` field in those sessions to the origin path. `codex resume` can then surface them from the main repo.
+- **Extensible**: controlled by `GIT_WT_AI_PROVIDERS` (default `"claude codex"`). Add new providers by defining `_ai_copy_<name>` + `_ai_save_<name>` functions in the script.
 
 To opt out (single run or permanently):
 
@@ -353,8 +354,6 @@ Completions support subcommands, flags, worktree names, and branch names.
 ## Known Issues
 
 - **Warp Terminal**: Tab completions for `git wt` don't work. Warp uses its own completion engine and [doesn't delegate to shell completions](https://github.com/warpdotdev/Warp/discussions/434). Completions work correctly in Terminal.app, iTerm2, Ghostty, Kitty, and other terminals that use native zsh/bash completion.
-
-- **Codex session history**: Codex manages its own worktrees at `~/.codex/worktrees/<hash>/` and deletes them after each session. The `/resume` command can't find old sessions because their `cwd` paths no longer exist. This is a Codex-side limitation — `--copy-ai` does not cover Codex since its sessions are not tied to project paths.
 
 ## Uninstall
 
