@@ -8,7 +8,7 @@
 # shellcheck disable=SC2059  # intentional: ANSI color codes in printf format strings
 set -euo pipefail
 
-GIT_WT_VERSION="1.5.0"
+GIT_WT_VERSION="1.5.1"
 
 # --- Config ---
 GIT_WT_HOME="${GIT_WT_HOME:-${HOME}/.git-wt}"
@@ -240,8 +240,11 @@ _wt_names() {
 # --- AI provider integration ---
 # Extensible system: add _ai_copy_<name> + _ai_save_<name> functions for new providers.
 
-# Encode absolute path to Claude project ID: /a/b/c → -a-b-c
-_claude_project_id() { echo "${1//\//-}"; }
+# Encode absolute path to Claude project ID: replaces every non-alphanumeric
+# character with '-'. Matches Claude Code's own encoding, which is why
+# '/Users/kuder/.git-wt/repo/name' maps to '-Users-kuder--git-wt-repo-name'
+# (note the double dash — the '.' in '.git-wt' also becomes '-').
+_claude_project_id() { echo "${1//[^a-zA-Z0-9]/-}"; }
 
 # Copy AI configs from origin to new worktree
 _ai_copy_all() {

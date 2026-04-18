@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.5.1] - 2026-04-18
+
+### Fixed
+- Claude session archival on `git wt rm` — project ID encoding now replaces every non-alphanumeric character with `-` (matches Claude Code's own encoding). Previously only `/` was encoded, so the `.` in `~/.git-wt/...` caused the session directory lookup to miss and archival was silently skipped.
+
 ## [1.5.0] - 2026-02-25
 
 ### Added
