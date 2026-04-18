@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.8.1] - 2026-04-18
+
+### Fixed
+- `git wt new` / `git wt checkout` exited with code 1 before printing the final "Worktree ready:" block when no Codex sessions matched origin. Root cause: the empty-marker cleanup used `[[ … ]] && rm -f` as the last statement of `_ai_copy_codex`; when the test was false, the whole function returned non-zero and `set -e` killed the script. Broke `wtn` / `wtco` shell aliases too, since they rely on the "Path:" line to cd into the new worktree.
+
 ## [1.8.0] - 2026-04-18
 
 ### Added

@@ -8,7 +8,7 @@
 # shellcheck disable=SC2059  # intentional: ANSI color codes in printf format strings
 set -euo pipefail
 
-GIT_WT_VERSION="1.8.0"
+GIT_WT_VERSION="1.8.1"
 
 # --- Config ---
 GIT_WT_HOME="${GIT_WT_HOME:-${HOME}/.git-wt}"
@@ -457,10 +457,11 @@ _ai_copy_codex() {
 
   if [[ $copied -gt 0 ]]; then
     info "  Seeded ${copied} Codex session(s) from origin (codex resume in worktree)"
-  else
+  elif [[ -f "$marker" && ! -s "$marker" ]]; then
     # No copies happened — don't leave an empty marker around
-    [[ -f "$marker" && ! -s "$marker" ]] && rm -f "$marker"
+    rm -f "$marker"
   fi
+  return 0
 }
 
 _ai_save_codex() {
