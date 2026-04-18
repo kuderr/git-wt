@@ -22,21 +22,21 @@ If not installed, ask the user to install it themselves.
 
 ### Create a worktree
 ```bash
-git wt new                           # Auto-named (e.g., swift-jade)
+git wt new                           # Auto-named; .env* + AI sessions copied by default
 git wt new my-feature                # Named
 git wt new -b main hotfix            # Fork from specific branch
-git wt new --copy-env experiment     # Copy .env* files into worktree
-git wt new --copy-ai my-feature      # Copy AI configs, save sessions on rm
+git wt new --no-copy-env experiment  # Opt out of .env* copy
+git wt new --no-copy-ai scratch      # Opt out of AI session copy/save
 git wt new --no-branch scratch       # Detached HEAD (no branch created)
 ```
 
 ### Check out an existing branch
 ```bash
-git wt checkout feature/login           # Local branch → worktree
-git wt checkout origin/fix/bug-42       # Remote → local tracking branch → worktree
-git wt checkout fix/bug-42              # Auto-detects from remote
-git wt checkout feature/login my-fix    # Custom worktree name
-git wt checkout --copy-env feature/api  # Also copy .env files
+git wt checkout feature/login              # Local branch → worktree (.env* + AI copied by default)
+git wt checkout origin/fix/bug-42          # Remote → local tracking branch → worktree
+git wt checkout fix/bug-42                 # Auto-detects from remote
+git wt checkout feature/login my-fix       # Custom worktree name
+git wt checkout --no-copy-env feature/api  # Opt out of .env* copy
 ```
 
 ### Navigate to a worktree
@@ -84,15 +84,16 @@ git wt clean                         # Remove all managed worktrees for current 
 - **`adopt`**: moves an external worktree under `~/.git-wt/` so git-wt fully manages it
 - **External worktrees**: `list`, `path`, `open` work with worktrees created outside git-wt
 - **`checkout`**: checks out an existing branch (local or remote) into a managed worktree — does NOT create new branches
-- **`--copy-env`**: copies `.env*` files from repo root into the new worktree directory (local filesystem only)
-- **`--copy-ai`**: copies AI config files into worktree on create; on rm, merges Claude sessions into the origin repo's Claude project (so `/resume` in the main repo sees them) and syncs settings back (local filesystem only)
+- **`.env*` copy**: enabled by default — copies `.env*` files from repo root into the new worktree directory (local filesystem only). Disable with `--no-copy-env` per run or `GIT_WT_COPY_ENV=false`.
+- **AI session preservation**: enabled by default — copies AI config files into worktree on create; on rm, merges Claude sessions into the origin repo's Claude project (so `/resume` in the main repo sees them) and syncs settings back (local filesystem only). Disable with `--no-copy-ai` per run or `GIT_WT_COPY_AI=false`.
 - **`origin`**: prints main repo path — works from any worktree or main repo itself
 
 ## Environment Variables
 
 - `GIT_WT_HOME` — Root directory for all worktrees (default: `~/.git-wt`)
 - `GIT_WT_PREFIX` — Branch name prefix (default: `wt`)
-- `GIT_WT_COPY_AI` — Always copy AI configs on new, save sessions on rm (default: `false`)
+- `GIT_WT_COPY_ENV` — Copy `.env*` files on new (default: `true`)
+- `GIT_WT_COPY_AI` — Copy AI configs on new, save sessions on rm (default: `true`)
 - `GIT_WT_AI_PROVIDERS` — Space-separated AI providers to manage (default: `claude`)
 
 ## When to Use
@@ -103,14 +104,14 @@ Use `git wt new` when:
 - Experimenting without affecting the current branch
 - Needing to quickly switch context between features
 
-Use `git wt new --copy-env` when:
-- The project has `.env` files needed for the dev server to start
-- The worktree needs the same configuration as the main repo
+Defaults you get for free (no flags):
+- `.env*` files from the repo root are copied into the worktree — dev servers that need env vars start immediately
+- `.claude/settings.local.json` (approved Claude commands) is copied into the worktree on create
+- On `rm`, Claude session files are merged into the origin repo's Claude project and `cwd` inside each JSONL is rewritten — sessions show up in `/resume` from the main repo
 
-Use `git wt new --copy-ai` when:
-- Working with Claude Code or other AI tools in worktrees
-- You want approved commands (`.claude/settings.local.json`) available immediately
-- You want Claude sessions preserved (visible in `/resume` from the main repo) when the worktree is removed
+Use `--no-copy-env` / `--no-copy-ai` (or set `GIT_WT_COPY_ENV=false` / `GIT_WT_COPY_AI=false`) when:
+- You want a fully clean worktree without env or AI config
+- You're in CI or a scripted context where these are noise
 
 Use `git wt checkout` when:
 - You need to work on an existing branch in an isolated worktree

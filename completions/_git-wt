@@ -34,14 +34,18 @@ _git-wt() {
             '(-b --base)'{-b,--base}'[Base branch to fork from]:branch:__git_branch_names' \
             '(-p --prefix)'{-p,--prefix}'[Branch prefix]:prefix:' \
             '--no-branch[Use detached HEAD]' \
-            '--copy-env[Copy .env files into worktree]' \
-            '--copy-ai[Copy AI agent configs and save sessions on rm]' \
+            '(--no-copy-env)--copy-env[Copy .env files into worktree (default on)]' \
+            '(--copy-env)--no-copy-env[Skip .env copy for this run]' \
+            '(--no-copy-ai)--copy-ai[Copy AI agent configs and save sessions on rm (default on)]' \
+            '(--copy-ai)--no-copy-ai[Skip AI config copy / session save for this run]' \
             ':name:'
           ;;
         checkout|co)
           _arguments \
-            '--copy-env[Copy .env files into worktree]' \
-            '--copy-ai[Copy AI agent configs and save sessions on rm]' \
+            '(--no-copy-env)--copy-env[Copy .env files into worktree (default on)]' \
+            '(--copy-env)--no-copy-env[Skip .env copy for this run]' \
+            '(--no-copy-ai)--copy-ai[Copy AI agent configs and save sessions on rm (default on)]' \
+            '(--copy-ai)--no-copy-ai[Skip AI config copy / session save for this run]' \
             ':branch:__git_branch_names_all' \
             ':name:'
           ;;

@@ -55,14 +55,14 @@ _git_wt() {
           ;;
         *)
           if [[ "$cur" == -* ]]; then
-            COMPREPLY=($(compgen -W "-b --base -p --prefix --no-branch --copy-env --copy-ai" -- "$cur"))
+            COMPREPLY=($(compgen -W "-b --base -p --prefix --no-branch --copy-env --no-copy-env --copy-ai --no-copy-ai" -- "$cur"))
           fi
           ;;
       esac
       ;;
     checkout|co)
       if [[ "$cur" == -* ]]; then
-        COMPREPLY=($(compgen -W "--copy-env --copy-ai" -- "$cur"))
+        COMPREPLY=($(compgen -W "--copy-env --no-copy-env --copy-ai --no-copy-ai" -- "$cur"))
       else
         # Complete with local + remote branch names
         local branches

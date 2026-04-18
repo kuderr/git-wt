@@ -3,7 +3,11 @@
 ## [1.6.0] - 2026-04-18
 
 ### Changed
+- **`--copy-env` and `--copy-ai` are now on by default.** Previously opt-in via flag or `GIT_WT_COPY_*=true`; now opt-out via `--no-copy-env` / `--no-copy-ai` or `GIT_WT_COPY_*=false`. The "no .env files found" warning now only fires when `--copy-env` is passed explicitly.
 - **Claude session preservation on `git wt rm` now merges sessions into the origin repo's Claude project directory** (`~/.claude/projects/<origin-encoded>/`) instead of archiving to `.ai-sessions/`. The `cwd` field inside every JSONL (including nested subagent files) is rewritten from the worktree path to the origin path so sessions appear in `/resume` when you're back in the main repo. Subagent JSONLs are covered too.
+
+### Added
+- `--no-copy-env` and `--no-copy-ai` flags on `new` and `checkout` — per-run opt-out.
 
 ### Fixed
 - Claude project ID encoding — now replaces every non-alphanumeric character with `-` (matches Claude Code's own encoding). Previously only `/` was encoded, so the `.` in `~/.git-wt/...` caused the session directory lookup to miss and preservation was silently skipped.

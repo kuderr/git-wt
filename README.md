@@ -159,15 +159,15 @@ Options for `git wt new`:
 | `-b, --base <branch>` | Branch to fork from (default: current branch) |
 | `-p, --prefix <prefix>` | Branch prefix (default: `wt`) |
 | `--no-branch` | Create with detached HEAD instead of a new branch |
-| `--copy-env` | Copy `.env*` files from the repo root into the worktree |
-| `--copy-ai` | Copy AI agent configs and save sessions on rm |
+| `--copy-env` / `--no-copy-env` | Copy `.env*` files from the repo root into the worktree (default: **on**) |
+| `--copy-ai` / `--no-copy-ai` | Copy AI agent configs and save sessions on rm (default: **on**) |
 
 Options for `git wt checkout`:
 
 | Flag | Description |
 |------|-------------|
-| `--copy-env` | Copy `.env*` files from the repo root into the worktree |
-| `--copy-ai` | Copy AI agent configs and save sessions on rm |
+| `--copy-env` / `--no-copy-env` | Copy `.env*` files from the repo root into the worktree (default: **on**) |
+| `--copy-ai` / `--no-copy-ai` | Copy AI agent configs and save sessions on rm (default: **on**) |
 
 Global flags:
 
@@ -182,8 +182,8 @@ Global flags:
 | `GIT_WT_HOME` | `~/.git-wt` | Root directory for all worktrees |
 | `GIT_WT_PREFIX` | `wt` | Branch name prefix |
 | `GIT_WT_BASE` | _(current branch)_ | Default base branch for new worktrees |
-| `GIT_WT_COPY_ENV` | `false` | Always copy `.env*` files on new |
-| `GIT_WT_COPY_AI` | `false` | Always copy AI configs on new, save sessions on rm |
+| `GIT_WT_COPY_ENV` | `true` | Copy `.env*` files on new (set `false` to opt out) |
+| `GIT_WT_COPY_AI` | `true` | Copy AI configs on new, save sessions on rm (set `false` to opt out) |
 | `GIT_WT_AI_PROVIDERS` | `claude` | Space-separated list of AI providers to manage |
 
 ## How It Works
@@ -234,11 +234,11 @@ This works from the main repo too (prints its own path). Useful for scripts that
 
 ### Session preservation
 
-AI tools like Claude Code store sessions and settings per project path. When a worktree is deleted, that data is normally lost. Use `--copy-ai` to preserve it:
+AI tools like Claude Code store sessions and settings per project path. When a worktree is deleted, that data is normally lost. `git-wt` preserves it **by default** — no flag required:
 
 ```bash
-# On create: copies .claude/settings.local.json into worktree
-git wt new --copy-ai my-feature
+# On create: copies .claude/settings.local.json into worktree (default on)
+git wt new my-feature
 
 # Work in the worktree — AI tools create sessions, you approve new commands...
 
@@ -254,10 +254,11 @@ git wt rm my-feature
 - **On remove**: moves Claude Code session files from the worktree's Claude project dir into the origin repo's Claude project dir (`~/.claude/projects/<origin-encoded>/`) and rewrites `cwd` inside each JSONL so sessions show up in `/resume` when you're back in the main repo. Also syncs settings back to origin.
 - **Extensible**: add new providers via `GIT_WT_AI_PROVIDERS` (define `_ai_copy_<name>` + `_ai_save_<name>` functions in the script)
 
-To enable this permanently:
+To opt out (single run or permanently):
 
 ```bash
-export GIT_WT_COPY_AI=true  # add to ~/.zshrc or ~/.bashrc
+git wt new --no-copy-ai my-feature    # single run
+export GIT_WT_COPY_AI=false           # permanent (add to ~/.zshrc or ~/.bashrc)
 ```
 
 ### Agent Skill

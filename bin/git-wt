@@ -15,8 +15,8 @@ GIT_WT_HOME="${GIT_WT_HOME:-${HOME}/.git-wt}"
 WT_PREFIX="${GIT_WT_PREFIX:-wt}"
 WT_BASE="${GIT_WT_BASE:-}"
 WT_NO_BRANCH=false
-WT_COPY_ENV="${GIT_WT_COPY_ENV:-false}"
-WT_COPY_AI="${GIT_WT_COPY_AI:-false}"
+WT_COPY_ENV="${GIT_WT_COPY_ENV:-true}"
+WT_COPY_AI="${GIT_WT_COPY_AI:-true}"
 WT_QUIET=false
 
 # --- Colors (respect NO_COLOR and non-tty) ---
@@ -358,16 +358,19 @@ _ai_save_claude() {
 cmd_new() {
   local name=""
   local positional=()
+  local copy_env_explicit=false
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
       -b|--base)    WT_BASE="$2"; shift 2 ;;
       -p|--prefix)  WT_PREFIX="$2"; shift 2 ;;
       --no-branch)  WT_NO_BRANCH=true; shift ;;
-      --copy-env)   WT_COPY_ENV=true; shift ;;
-      --copy-ai)    WT_COPY_AI=true; shift ;;
-      -*)           die "unknown option: $1" ;;
-      *)            positional+=("$1"); shift ;;
+      --copy-env)    WT_COPY_ENV=true; copy_env_explicit=true; shift ;;
+      --no-copy-env) WT_COPY_ENV=false; shift ;;
+      --copy-ai)     WT_COPY_AI=true; shift ;;
+      --no-copy-ai)  WT_COPY_AI=false; shift ;;
+      -*)            die "unknown option: $1" ;;
+      *)             positional+=("$1"); shift ;;
     esac
   done
 
@@ -393,7 +396,7 @@ cmd_new() {
     git worktree add -b "$branch" "$wt_path" "$base"
   fi
 
-  # Copy env files if requested
+  # Copy env files if enabled
   if $WT_COPY_ENV; then
     local repo_root
     repo_root=$(get_repo_root)
@@ -405,12 +408,14 @@ cmd_new() {
         copied=$((copied + 1))
       fi
     done
-    if [[ $copied -eq 0 ]]; then
+    # Only warn if user explicitly asked for --copy-env. With the new
+    # default-on behavior, an empty result is expected for most repos.
+    if [[ $copied -eq 0 ]] && $copy_env_explicit; then
       warn "no .env* files found to copy"
     fi
   fi
 
-  # Copy AI agent configs if requested
+  # Copy AI agent configs if enabled
   if [[ "$WT_COPY_AI" == "true" ]]; then
     local ai_origin
     ai_origin=$(get_repo_root)
@@ -431,13 +436,16 @@ cmd_checkout() {
   local branch=""
   local name=""
   local positional=()
+  local copy_env_explicit=false
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      --copy-env)   WT_COPY_ENV=true; shift ;;
-      --copy-ai)    WT_COPY_AI=true; shift ;;
-      -*)           die "unknown option: $1" ;;
-      *)            positional+=("$1"); shift ;;
+      --copy-env)    WT_COPY_ENV=true; copy_env_explicit=true; shift ;;
+      --no-copy-env) WT_COPY_ENV=false; shift ;;
+      --copy-ai)     WT_COPY_AI=true; shift ;;
+      --no-copy-ai)  WT_COPY_AI=false; shift ;;
+      -*)            die "unknown option: $1" ;;
+      *)             positional+=("$1"); shift ;;
     esac
   done
 
@@ -480,7 +488,7 @@ cmd_checkout() {
       ;;
   esac
 
-  # Copy env files if requested
+  # Copy env files if enabled
   if $WT_COPY_ENV; then
     local repo_root
     repo_root=$(get_repo_root)
@@ -492,12 +500,12 @@ cmd_checkout() {
         copied=$((copied + 1))
       fi
     done
-    if [[ $copied -eq 0 ]]; then
+    if [[ $copied -eq 0 ]] && $copy_env_explicit; then
       warn "no .env* files found to copy"
     fi
   fi
 
-  # Copy AI agent configs if requested
+  # Copy AI agent configs if enabled
   if [[ "$WT_COPY_AI" == "true" ]]; then
     local ai_origin
     ai_origin=$(get_repo_root)
@@ -823,19 +831,23 @@ ${BOLD}Options for new:${RESET}
   -b, --base <branch>      Base branch to fork from (default: current)
   -p, --prefix <prefix>    Branch prefix (default: wt/)
   --no-branch              Use detached HEAD
-  --copy-env               Copy .env* files into new worktree
-  --copy-ai                Copy AI agent configs and save sessions on rm
+  --copy-env               Copy .env* files into new worktree (default: on)
+  --no-copy-env            Disable .env* copy for this run
+  --copy-ai                Copy AI agent configs and save sessions on rm (default: on)
+  --no-copy-ai             Disable AI config copy / session save for this run
 
 ${BOLD}Options for checkout:${RESET}
-  --copy-env               Copy .env* files into worktree
-  --copy-ai                Copy AI agent configs and save sessions on rm
+  --copy-env               Copy .env* files into worktree (default: on)
+  --no-copy-env            Disable .env* copy for this run
+  --copy-ai                Copy AI agent configs and save sessions on rm (default: on)
+  --no-copy-ai             Disable AI config copy / session save for this run
 
 ${BOLD}Environment:${RESET}
   GIT_WT_HOME              Worktrees root (default: ~/.git-wt)
   GIT_WT_PREFIX            Default branch prefix (default: wt)
   GIT_WT_BASE              Default base branch for new worktrees (default: current branch)
-  GIT_WT_COPY_ENV          Always copy .env* files on new (default: false)
-  GIT_WT_COPY_AI           Always copy AI configs on new, save on rm (default: false)
+  GIT_WT_COPY_ENV          Copy .env* files on new (default: true; set 'false' to opt out)
+  GIT_WT_COPY_AI           Copy AI configs on new, save sessions on rm (default: true; set 'false' to opt out)
   GIT_WT_AI_PROVIDERS      Space-separated AI providers (default: "claude")
 
 ${BOLD}Examples:${RESET}
