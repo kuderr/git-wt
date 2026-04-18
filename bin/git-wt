@@ -8,7 +8,7 @@
 # shellcheck disable=SC2059  # intentional: ANSI color codes in printf format strings
 set -euo pipefail
 
-GIT_WT_VERSION="1.5.1"
+GIT_WT_VERSION="1.6.0"
 
 # --- Config ---
 GIT_WT_HOME="${GIT_WT_HOME:-${HOME}/.git-wt}"
@@ -281,17 +281,65 @@ _ai_copy_claude() {
   fi
 }
 
+# Rewrite the `cwd` field inside a Claude JSONL session file.
+# Moves references to the old worktree path over to the origin path so that
+# /resume in the origin repo sees internally-consistent sessions.
+_rewrite_cwd_jsonl() {
+  local file="$1" from="$2" to="$3"
+  local from_esc to_esc
+  # Escape BRE metacharacters in the search pattern. Using `|` as the sed
+  # delimiter avoids having to escape `/` (which every absolute path contains).
+  from_esc=$(printf '%s' "$from" | sed 's/[][\\.^$*|]/\\&/g')
+  to_esc=$(printf '%s' "$to" | sed 's/[\\|&]/\\&/g')
+  if sed --version >/dev/null 2>&1; then
+    sed -i "s|\"cwd\":\"${from_esc}\"|\"cwd\":\"${to_esc}\"|g" "$file"
+  else
+    sed -i '' "s|\"cwd\":\"${from_esc}\"|\"cwd\":\"${to_esc}\"|g" "$file"
+  fi
+}
+
 _ai_save_claude() {
+  # shellcheck disable=SC2034  # archive_dir kept for provider signature symmetry
   local wt_path="$1" wt_name="$2" archive_dir="$3" origin="$4"
 
-  # Archive sessions from ~/.claude/projects/<encoded-path>/
-  local project_id
-  project_id=$(_claude_project_id "$wt_path")
-  local claude_project="${HOME}/.claude/projects/${project_id}"
-  if [[ -d "$claude_project" ]]; then
-    mkdir -p "${archive_dir}/claude"
-    mv "$claude_project" "${archive_dir}/claude/sessions"
-    info "  Archived Claude sessions → .ai-sessions/${wt_name}/claude/"
+  # Merge sessions from the worktree's project dir into the origin's project
+  # dir so that `/resume` in the origin repo picks them up. We also rewrite
+  # the `cwd` field inside every jsonl so each session is self-consistent.
+  local wt_project_id origin_project_id
+  wt_project_id=$(_claude_project_id "$wt_path")
+  origin_project_id=$(_claude_project_id "$origin")
+  local wt_claude="${HOME}/.claude/projects/${wt_project_id}"
+  local origin_claude="${HOME}/.claude/projects/${origin_project_id}"
+
+  if [[ -d "$wt_claude" ]]; then
+    mkdir -p "$origin_claude"
+
+    # Rewrite cwd in every jsonl (top-level sessions + nested subagents)
+    local moved=0
+    while IFS= read -r -d '' f; do
+      _rewrite_cwd_jsonl "$f" "$wt_path" "$origin"
+    done < <(find "$wt_claude" -name '*.jsonl' -type f -print0)
+
+    # Move all entries (files + session-uuid folders) into origin project dir.
+    # Skip collisions (session UUIDs don't collide in practice, but be safe).
+    local entry base
+    shopt -s nullglob dotglob
+    for entry in "$wt_claude"/*; do
+      base=$(basename "$entry")
+      if [[ -e "${origin_claude}/${base}" ]]; then
+        warn "Skipping existing '${base}' in origin Claude project"
+        continue
+      fi
+      mv "$entry" "${origin_claude}/"
+      moved=$((moved + 1))
+    done
+    shopt -u nullglob dotglob
+
+    rmdir "$wt_claude" 2>/dev/null || true
+
+    if [[ $moved -gt 0 ]]; then
+      info "  Merged ${moved} Claude session entry(s) → origin (/resume will see them)"
+    fi
   fi
 
   # Sync settings.local.json back to origin if changed

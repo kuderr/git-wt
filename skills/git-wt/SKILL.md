@@ -85,7 +85,7 @@ git wt clean                         # Remove all managed worktrees for current 
 - **External worktrees**: `list`, `path`, `open` work with worktrees created outside git-wt
 - **`checkout`**: checks out an existing branch (local or remote) into a managed worktree — does NOT create new branches
 - **`--copy-env`**: copies `.env*` files from repo root into the new worktree directory (local filesystem only)
-- **`--copy-ai`**: copies AI config files into worktree on create; archives session files back on rm (local filesystem only)
+- **`--copy-ai`**: copies AI config files into worktree on create; on rm, merges Claude sessions into the origin repo's Claude project (so `/resume` in the main repo sees them) and syncs settings back (local filesystem only)
 - **`origin`**: prints main repo path — works from any worktree or main repo itself
 
 ## Environment Variables
@@ -110,7 +110,7 @@ Use `git wt new --copy-env` when:
 Use `git wt new --copy-ai` when:
 - Working with Claude Code or other AI tools in worktrees
 - You want approved commands (`.claude/settings.local.json`) available immediately
-- You want Claude sessions archived (not lost) when the worktree is removed
+- You want Claude sessions preserved (visible in `/resume` from the main repo) when the worktree is removed
 
 Use `git wt checkout` when:
 - You need to work on an existing branch in an isolated worktree
@@ -154,7 +154,7 @@ git wt new --copy-env --copy-ai task-api
 # Each agent works independently in their worktree
 cd $(git wt path task-auth)
 
-# When done — sessions archived, settings synced back
+# When done — sessions merged into origin (/resume), settings synced back
 git wt rm task-auth
 git wt rm task-api
 ```

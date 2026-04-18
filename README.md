@@ -242,15 +242,16 @@ git wt new --copy-ai my-feature
 
 # Work in the worktree — AI tools create sessions, you approve new commands...
 
-# On rm: archives Claude sessions, syncs settings back to origin
+# On rm: merges Claude sessions into the origin repo's Claude project so
+# `/resume` can see them, and syncs settings back to origin.
 git wt rm my-feature
-#   Archived Claude sessions → .ai-sessions/my-feature/claude/
+#   Merged 3 Claude session entry(s) → origin (/resume will see them)
 #   Synced .claude/settings.local.json → origin
 ```
 
 **What happens:**
 - **On create**: copies `.claude/settings.local.json` (approved commands) into the worktree
-- **On remove**: archives Claude Code sessions to `~/.git-wt/<repo>/.ai-sessions/<name>/`, syncs settings back to origin
+- **On remove**: moves Claude Code session files from the worktree's Claude project dir into the origin repo's Claude project dir (`~/.claude/projects/<origin-encoded>/`) and rewrites `cwd` inside each JSONL so sessions show up in `/resume` when you're back in the main repo. Also syncs settings back to origin.
 - **Extensible**: add new providers via `GIT_WT_AI_PROVIDERS` (define `_ai_copy_<name>` + `_ai_save_<name>` functions in the script)
 
 To enable this permanently:
