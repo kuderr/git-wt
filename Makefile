@@ -3,7 +3,7 @@ BINDIR ?= $(PREFIX)/bin
 BASH_COMPLETIONS_DIR ?= $(PREFIX)/share/bash-completion/completions
 ZSH_COMPLETIONS_DIR ?= $(PREFIX)/share/zsh/site-functions
 
-.PHONY: install uninstall install-completions uninstall-completions lint test
+.PHONY: install uninstall install-completions uninstall-completions lint test test-ai-copy
 
 install: install-completions
 	@mkdir -p $(BINDIR)
@@ -29,8 +29,12 @@ uninstall-completions:
 lint:
 	shellcheck bin/git-wt
 	shellcheck install.sh
+	shellcheck tests/test-ai-copy.sh
 
-test:
+test-ai-copy:
+	./tests/test-ai-copy.sh
+
+test: test-ai-copy
 	@echo "Running smoke test..."
 	@cd /tmp && git init git-wt-test-repo && cd git-wt-test-repo && \
 		git commit --allow-empty -m "init" && \

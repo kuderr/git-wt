@@ -85,7 +85,7 @@ git wt clean                         # Remove all managed worktrees for current 
 - **External worktrees**: `list`, `path`, `open` work with worktrees created outside git-wt
 - **`checkout`**: checks out an existing branch (local or remote) into a managed worktree — does NOT create new branches
 - **`.env*` copy**: enabled by default — copies `.env*` files from repo root into the new worktree directory (local filesystem only). Disable with `--no-copy-env` per run or `GIT_WT_COPY_ENV=false`.
-- **AI session preservation**: enabled by default. On create: copies AI config files and seeds origin's Claude + Codex sessions into the worktree (history visible in `/resume` and `codex resume` there). On rm: merges wt's Claude sessions back to origin (wt continuations win), discards seeded Codex copies, rebinds genuine wt-created Codex sessions to origin, syncs settings back. Local filesystem only. Disable with `--no-copy-ai` per run or `GIT_WT_COPY_AI=false`.
+- **AI session preservation**: enabled by default. On create: copies the complete repo-local `.claude` directory (including untracked skills, agents, and hooks) and seeds origin's Claude + Codex sessions into the worktree (history visible in `/resume` and `codex resume` there). On rm: merges wt's Claude sessions back to origin (wt continuations win), discards seeded Codex copies, rebinds genuine wt-created Codex sessions to origin, syncs settings back. Local filesystem only. Disable with `--no-copy-ai` per run or `GIT_WT_COPY_AI=false`.
 - **`origin`**: prints main repo path — works from any worktree or main repo itself
 
 ## Environment Variables
@@ -94,6 +94,7 @@ git wt clean                         # Remove all managed worktrees for current 
 - `GIT_WT_PREFIX` — Branch name prefix (default: `wt`)
 - `GIT_WT_COPY_ENV` — Copy `.env*` files on new (default: `true`)
 - `GIT_WT_COPY_AI` — Copy AI configs on new, save sessions on rm (default: `true`)
+- `GIT_WT_AI_COPY_PATHS` — Colon-separated repo-relative files/directories copied by `--copy-ai` (default: `.claude`; empty disables project-file copying)
 - `GIT_WT_AI_PROVIDERS` — Space-separated AI providers to manage (default: `claude codex`)
 
 ## When to Use
@@ -106,7 +107,7 @@ Use `git wt new` when:
 
 Defaults you get for free (no flags):
 - `.env*` files from the repo root are copied into the worktree — dev servers that need env vars start immediately
-- `.claude/settings.local.json` (approved Claude commands) is copied into the worktree on create
+- The complete repo-local `.claude` directory is copied into the worktree on create, including ignored or untracked settings, skills, agents, and hooks. Files checked out from Git are not overwritten. Customize the paths with `GIT_WT_AI_COPY_PATHS='.claude:.agents:.cursor/rules'`.
 - On `new`, origin's Claude sessions are seeded into the worktree (cwd rewritten) and origin's Codex rollouts are duplicated with fresh UUIDs/cwd — `/resume` and `codex resume` in the worktree pick up the same history
 - On `rm`, Claude session files are merged back to origin (newer wt continuations replace origin's version), the seeded Codex copies are discarded, and genuine worktree Codex sessions get their `cwd` rebound to origin
 
@@ -141,6 +142,7 @@ Optional `aliases/git-wt.sh` provides shorter commands. Source it in `.bashrc`/`
 - All operations are **local filesystem only** — git-wt never makes network requests or sends data externally
 - `--copy-env` copies `.env*` files between local directories on the same machine (repo root → worktree)
 - `--copy-ai` copies AI config/session files between local directories on the same machine
+- `GIT_WT_AI_COPY_PATHS` accepts repo-relative paths only; absolute paths, `.git`, and `..` path components are rejected
 - No credentials, tokens, or secrets leave the local filesystem
 - Worktrees are stored under `~/.git-wt/` with standard filesystem permissions
 

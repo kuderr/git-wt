@@ -184,6 +184,7 @@ Global flags:
 | `GIT_WT_BASE` | _(current branch)_ | Default base branch for new worktrees |
 | `GIT_WT_COPY_ENV` | `true` | Copy `.env*` files on new (set `false` to opt out) |
 | `GIT_WT_COPY_AI` | `true` | Copy AI configs on new, save sessions on rm (set `false` to opt out) |
+| `GIT_WT_AI_COPY_PATHS` | `.claude` | Colon-separated repo-relative files/directories copied by `--copy-ai`; set to an empty string to disable project-file copying |
 | `GIT_WT_AI_PROVIDERS` | `claude codex` | Space-separated list of AI providers to manage |
 
 ## How It Works
@@ -237,7 +238,7 @@ This works from the main repo too (prints its own path). Useful for scripts that
 AI tools like Claude Code store sessions and settings per project path. When a worktree is deleted, that data is normally lost. `git-wt` preserves it **by default** — no flag required:
 
 ```bash
-# On create: copies .claude/settings.local.json into worktree (default on)
+# On create: copies the complete .claude directory into the worktree (default on)
 git wt new my-feature
 
 # Work in the worktree — AI tools create sessions, you approve new commands...
@@ -250,11 +251,24 @@ git wt rm my-feature
 ```
 
 **What happens:**
-- **On create (Claude)**: copies `.claude/settings.local.json` into the worktree; **seeds** origin's Claude project dir into the worktree's project dir with `cwd` rewritten to the worktree path — `/resume` inside the worktree sees the same history (origin keeps its copy untouched).
+- **On create (project files)**: copies the complete repo-local `.claude` directory by default, including ignored or untracked settings, skills, agents, and hooks. Files already checked out in the new worktree are never overwritten, so branch-specific tracked configuration stays intact.
+- **On create (Claude sessions)**: **seeds** origin's Claude project dir into the worktree's project dir with `cwd` rewritten to the worktree path — `/resume` inside the worktree sees the same history (origin keeps its copy untouched).
 - **On create (Codex)**: for every rollout in `~/.codex/archived_sessions/` whose `session_meta.cwd` matches origin, duplicates the file with a fresh UUID and `cwd` set to the worktree path, mirrors the `session_index.jsonl` entry, and records the new UUID in `$wt_path/.git-wt-codex-copies` so removal can clean up later. `codex resume` in the worktree sees the same history (origin's originals stay intact).
 - **On remove (Claude)**: moves Claude Code session files from the worktree's Claude project dir into the origin repo's Claude project dir (`~/.claude/projects/<origin-encoded>/`), rewrites `cwd` inside each JSONL, and if a session was seeded and continued in the worktree, the worktree's newer version replaces origin's. Also syncs settings back to origin.
 - **On remove (Codex)**: discards the seeded rollouts listed in `.git-wt-codex-copies` (they were disposable duplicates), then scans `~/.codex/archived_sessions/` for any remaining rollouts whose `cwd` matches the worktree path (genuine work done in the worktree) and rebinds `cwd` to origin so `codex resume` in the main repo surfaces them.
 - **Extensible**: controlled by `GIT_WT_AI_PROVIDERS` (default `"claude codex"`). Add new providers by defining `_ai_copy_<name>` + `_ai_save_<name>` functions in the script.
+
+Customize which project-level AI files are copied with a colon-separated list
+of paths relative to the repository root. Colons, rather than spaces, delimit
+entries, so paths containing spaces are supported:
+
+```bash
+export GIT_WT_AI_COPY_PATHS='.claude:.agents:.cursor/rules:team agent/hooks'
+```
+
+Missing paths are skipped. Absolute paths, `.git`, and paths containing a `..`
+component are rejected. Set `GIT_WT_AI_COPY_PATHS=''` to keep AI session
+preservation enabled without copying repo-local AI files.
 
 To opt out (single run or permanently):
 

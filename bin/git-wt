@@ -8,7 +8,7 @@
 # shellcheck disable=SC2059  # intentional: ANSI color codes in printf format strings
 set -euo pipefail
 
-GIT_WT_VERSION="1.8.1"
+GIT_WT_VERSION="1.9.0"
 
 # --- Config ---
 GIT_WT_HOME="${GIT_WT_HOME:-${HOME}/.git-wt}"
@@ -246,9 +246,69 @@ _wt_names() {
 # (note the double dash — the '.' in '.git-wt' also becomes '-').
 _claude_project_id() { echo "${1//[^a-zA-Z0-9]/-}"; }
 
-# Copy AI configs from origin to new worktree
+# Copy configured repo-local AI files and directories into a new worktree.
+# Paths are colon-separated so entries may contain spaces. The default copies
+# the whole .claude directory, including untracked skills, agents, and hooks.
+_ai_copy_project_paths() {
+  local origin="$1" wt_path="$2"
+  local configured="${GIT_WT_AI_COPY_PATHS-.claude}"
+  [[ -n "$configured" ]] || return 0
+
+  local paths=()
+  IFS=':' read -r -a paths <<< "$configured"
+
+  local path src dest
+  for path in "${paths[@]}"; do
+    # Normalize trailing slashes while preserving the root-path rejection.
+    while [[ "$path" == */ && "$path" != "/" ]]; do
+      path="${path%/}"
+    done
+    [[ -n "$path" ]] || continue
+
+    # Only repo-relative paths are allowed. In particular, never overwrite the
+    # worktree's own .git file or let a configured path escape the repository.
+    case "$path" in
+      /*|.|..|.git|.git/*|../*|*/../*|*/..)
+        warn "ignoring unsafe GIT_WT_AI_COPY_PATHS entry: ${path}"
+        continue
+        ;;
+    esac
+
+    src="${origin}/${path}"
+    dest="${wt_path}/${path}"
+    [[ -e "$src" || -L "$src" ]] || continue
+
+    if [[ -d "$src" && ! -L "$src" ]]; then
+      if [[ ! -e "$dest" && ! -L "$dest" ]]; then
+        mkdir -p "$(dirname "$dest")"
+        cp -RP "$src" "$dest"
+      else
+        # Merge one entry at a time so files checked out from the target branch
+        # are never overwritten. A plain recursive cp would clobber them, while
+        # cp -Rn skips whole existing directories on some platforms.
+        local entry relative target
+        while IFS= read -r -d '' entry; do
+          relative="${entry#"${src}/"}"
+          target="${dest}/${relative}"
+          [[ -e "$target" || -L "$target" ]] && continue
+          mkdir -p "$(dirname "$target")"
+          cp -RP "$entry" "$target"
+        done < <(find "$src" -mindepth 1 -print0)
+      fi
+    else
+      [[ -e "$dest" || -L "$dest" ]] && continue
+      mkdir -p "$(dirname "$dest")"
+      cp -P "$src" "$dest"
+    fi
+    info "  Copied ${path}"
+  done
+}
+
+# Copy AI configs and sessions from origin to new worktree
 _ai_copy_all() {
   local origin="$1" wt_path="$2"
+  _ai_copy_project_paths "$origin" "$wt_path"
+
   local provider
   for provider in ${GIT_WT_AI_PROVIDERS:-claude codex}; do
     if declare -f "_ai_copy_${provider}" >/dev/null 2>&1; then
@@ -274,15 +334,7 @@ _ai_save_all() {
 _ai_copy_claude() {
   local origin="$1" wt_path="$2"
 
-  # 1. Repo-level settings (approved commands) — same as before
-  local src="${origin}/.claude/settings.local.json"
-  if [[ -f "$src" ]]; then
-    mkdir -p "${wt_path}/.claude"
-    cp "$src" "${wt_path}/.claude/"
-    info "  Copied .claude/settings.local.json"
-  fi
-
-  # 2. Session history — copy origin's Claude project dir into the worktree's
+  # Session history — copy origin's Claude project dir into the worktree's
   # project dir and rewrite `cwd` so /resume in the new worktree sees the
   # same conversation history. Origin is left intact (copy, not move).
   local origin_project_id wt_project_id
@@ -1008,6 +1060,7 @@ ${BOLD}Environment:${RESET}
   GIT_WT_BASE              Default base branch for new worktrees (default: current branch)
   GIT_WT_COPY_ENV          Copy .env* files on new (default: true; set 'false' to opt out)
   GIT_WT_COPY_AI           Copy AI configs on new, save sessions on rm (default: true; set 'false' to opt out)
+  GIT_WT_AI_COPY_PATHS     Colon-separated repo-relative paths copied by --copy-ai (default: ".claude"; empty disables)
   GIT_WT_AI_PROVIDERS      Space-separated AI providers (default: "claude codex")
 
 ${BOLD}Examples:${RESET}

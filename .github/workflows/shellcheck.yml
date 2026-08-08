@@ -17,3 +17,5 @@ jobs:
         run: shellcheck bin/git-wt
       - name: Lint install.sh
         run: shellcheck install.sh
+      - name: Test AI project file copying
+        run: make test-ai-copy
