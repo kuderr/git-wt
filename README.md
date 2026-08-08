@@ -266,8 +266,9 @@ entries, so paths containing spaces are supported:
 export GIT_WT_AI_COPY_PATHS='.claude:.agents:.cursor/rules:team agent/hooks'
 ```
 
-Missing paths are skipped. Absolute paths, `.git`, and paths containing a `..`
-component are rejected. Set `GIT_WT_AI_COPY_PATHS=''` to keep AI session
+Missing paths are skipped. Absolute paths and paths containing a `.git` or `..`
+component are rejected. Destination symlinks and file/directory conflicts are
+left untouched. Set `GIT_WT_AI_COPY_PATHS=''` to keep AI session
 preservation enabled without copying repo-local AI files.
 
 To opt out (single run or permanently):

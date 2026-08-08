@@ -3,7 +3,7 @@
 ## [1.9.0] - 2026-08-08
 
 ### Added
-- `GIT_WT_AI_COPY_PATHS` configures a colon-separated list of repo-relative files and directories copied into new worktrees by `--copy-ai`. It defaults to the complete `.claude` directory, so ignored or untracked project skills, agents, hooks, and settings are available immediately without overwriting files checked out from Git. Empty disables project-file copying while retaining session preservation. Unsafe absolute, `.git`, and parent-traversal paths are rejected.
+- `GIT_WT_AI_COPY_PATHS` configures a colon-separated list of repo-relative files and directories copied into new worktrees by `--copy-ai`. It defaults to the complete `.claude` directory, so ignored or untracked project skills, agents, hooks, and settings are available immediately without overwriting files checked out from Git. Empty disables project-file copying while retaining session preservation. Unsafe absolute, `.git`, and parent-traversal paths are rejected, and destination symlinks are never followed.
 
 ## [1.8.1] - 2026-04-18
 

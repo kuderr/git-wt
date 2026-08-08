@@ -246,6 +246,99 @@ _wt_names() {
 # (note the double dash — the '.' in '.git-wt' also becomes '-').
 _claude_project_id() { echo "${1//[^a-zA-Z0-9]/-}"; }
 
+# Normalize one configured path without touching the filesystem. Empty and '.'
+# components are removed; absolute paths, '..', and any '.git' component are
+# rejected. The normalized path is printed on success.
+_ai_normalize_copy_path() {
+  local input="$1"
+  [[ "$input" != /* ]] || return 1
+
+  local components=()
+  IFS='/' read -r -a components <<< "$input"
+
+  local component normalized=""
+  for component in "${components[@]}"; do
+    case "$component" in
+      ""|.) continue ;;
+      ..|.git) return 1 ;;
+    esac
+    if [[ -z "$normalized" ]]; then
+      normalized="$component"
+    else
+      normalized="${normalized}/${component}"
+    fi
+  done
+
+  [[ -n "$normalized" ]] || return 1
+  printf '%s\n' "$normalized"
+}
+
+# Verify that every existing parent component is a real directory, not a
+# symlink or file. This prevents a configured source path escaping the repo.
+_ai_copy_source_parent_is_safe() {
+  local root="$1" relative="$2"
+  local parent="${relative%/*}"
+  [[ "$parent" != "$relative" ]] || return 0
+
+  local components=()
+  IFS='/' read -r -a components <<< "$parent"
+
+  local component current="$root"
+  for component in "${components[@]}"; do
+    current="${current}/${component}"
+    [[ -d "$current" && ! -L "$current" ]] || return 1
+  done
+}
+
+# Create missing destination parents while refusing to traverse symlinks or
+# non-directory components checked out from the target branch.
+_ai_prepare_copy_destination() {
+  local root="$1" relative="$2"
+  local parent="${relative%/*}"
+  [[ "$parent" != "$relative" ]] || return 0
+
+  local components=()
+  IFS='/' read -r -a components <<< "$parent"
+
+  local component current="$root"
+  for component in "${components[@]}"; do
+    current="${current}/${component}"
+    if [[ -L "$current" ]] || [[ -e "$current" && ! -d "$current" ]]; then
+      return 1
+    fi
+    [[ -d "$current" ]] || mkdir "$current"
+  done
+}
+
+# Merge a source entry without overwriting anything already checked out. Only
+# recurse when both sides are real directories; this also prevents writes
+# through destination symlinks and cleanly handles file/directory conflicts.
+_ai_copy_missing_entry() {
+  local src="$1" dest="$2"
+
+  if [[ -e "$dest" || -L "$dest" ]]; then
+    if [[ -d "$src" && ! -L "$src" && -d "$dest" && ! -L "$dest" ]]; then
+      local had_nullglob=false had_dotglob=false
+      shopt -q nullglob && had_nullglob=true
+      shopt -q dotglob && had_dotglob=true
+      shopt -s nullglob dotglob
+
+      local entries=("$src"/*)
+
+      $had_nullglob || shopt -u nullglob
+      $had_dotglob || shopt -u dotglob
+
+      local entry
+      for entry in "${entries[@]}"; do
+        _ai_copy_missing_entry "$entry" "${dest}/$(basename "$entry")"
+      done
+    fi
+    return 0
+  fi
+
+  cp -RP "$src" "$dest"
+}
+
 # Copy configured repo-local AI files and directories into a new worktree.
 # Paths are colon-separated so entries may contain spaces. The default copies
 # the whole .claude directory, including untracked skills, agents, and hooks.
@@ -257,50 +350,29 @@ _ai_copy_project_paths() {
   local paths=()
   IFS=':' read -r -a paths <<< "$configured"
 
-  local path src dest
-  for path in "${paths[@]}"; do
-    # Normalize trailing slashes while preserving the root-path rejection.
-    while [[ "$path" == */ && "$path" != "/" ]]; do
-      path="${path%/}"
-    done
-    [[ -n "$path" ]] || continue
-
-    # Only repo-relative paths are allowed. In particular, never overwrite the
-    # worktree's own .git file or let a configured path escape the repository.
-    case "$path" in
-      /*|.|..|.git|.git/*|../*|*/../*|*/..)
-        warn "ignoring unsafe GIT_WT_AI_COPY_PATHS entry: ${path}"
-        continue
-        ;;
-    esac
+  local configured_path path src dest
+  for configured_path in "${paths[@]}"; do
+    [[ -n "$configured_path" ]] || continue
+    if ! path=$(_ai_normalize_copy_path "$configured_path"); then
+      warn "ignoring unsafe GIT_WT_AI_COPY_PATHS entry: ${configured_path}"
+      continue
+    fi
 
     src="${origin}/${path}"
     dest="${wt_path}/${path}"
     [[ -e "$src" || -L "$src" ]] || continue
 
-    if [[ -d "$src" && ! -L "$src" ]]; then
-      if [[ ! -e "$dest" && ! -L "$dest" ]]; then
-        mkdir -p "$(dirname "$dest")"
-        cp -RP "$src" "$dest"
-      else
-        # Merge one entry at a time so files checked out from the target branch
-        # are never overwritten. A plain recursive cp would clobber them, while
-        # cp -Rn skips whole existing directories on some platforms.
-        local entry relative target
-        while IFS= read -r -d '' entry; do
-          relative="${entry#"${src}/"}"
-          target="${dest}/${relative}"
-          [[ -e "$target" || -L "$target" ]] && continue
-          mkdir -p "$(dirname "$target")"
-          cp -RP "$entry" "$target"
-        done < <(find "$src" -mindepth 1 -print0)
-      fi
-    else
-      [[ -e "$dest" || -L "$dest" ]] && continue
-      mkdir -p "$(dirname "$dest")"
-      cp -P "$src" "$dest"
+    if ! _ai_copy_source_parent_is_safe "$origin" "$path"; then
+      warn "ignoring AI copy path with symlinked source parent: ${configured_path}"
+      continue
     fi
-    info "  Copied ${path}"
+    if ! _ai_prepare_copy_destination "$wt_path" "$path"; then
+      warn "skipping AI copy path with conflicting destination parent: ${path}"
+      continue
+    fi
+
+    _ai_copy_missing_entry "$src" "$dest"
+    info "  Copied missing files from ${path}"
   done
 }
 

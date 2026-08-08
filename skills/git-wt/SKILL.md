@@ -142,7 +142,7 @@ Optional `aliases/git-wt.sh` provides shorter commands. Source it in `.bashrc`/`
 - All operations are **local filesystem only** — git-wt never makes network requests or sends data externally
 - `--copy-env` copies `.env*` files between local directories on the same machine (repo root → worktree)
 - `--copy-ai` copies AI config/session files between local directories on the same machine
-- `GIT_WT_AI_COPY_PATHS` accepts repo-relative paths only; absolute paths, `.git`, and `..` path components are rejected
+- `GIT_WT_AI_COPY_PATHS` accepts repo-relative paths only; absolute paths plus `.git` and `..` path components are rejected, and destination symlinks are never followed
 - No credentials, tokens, or secrets leave the local filesystem
 - Worktrees are stored under `~/.git-wt/` with standard filesystem permissions
 
